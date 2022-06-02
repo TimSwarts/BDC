@@ -8,7 +8,11 @@ CPU_COUNT = mp.cpu_count()
 
 def argument_parser():
     argparser = ap.ArgumentParser(description="This script parses fastq files into average PHRED scores over"
-                                              "each position")
+                                              "each position",
+                                  usage="python3 feel_the_pain.py -n <aantal_cpus>")
+    argparser.add_argument("-n", type=int, metavar='',  required=True,
+                           help="The amount of cores to use when running the application.")
+    argparser.add_argument("-o", type=str, metavar='', required=False)
 
 
 def average(lines, start, stop, output_queue):
