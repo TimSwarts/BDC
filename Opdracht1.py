@@ -9,10 +9,15 @@ CPU_COUNT = mp.cpu_count()
 def argument_parser():
     argparser = ap.ArgumentParser(description="This script parses fastq files into average PHRED scores over"
                                               "each position",
-                                  usage="python3 feel_the_pain.py -n <aantal_cpus>")
+                                  usage="python3 Opdracht1.py -n <aantal_cpus>")
     argparser.add_argument("-n", type=int, metavar='',  required=True,
                            help="The amount of cores to use when running the application.")
     argparser.add_argument("-o", type=str, metavar='', required=False)
+
+    argparser.add_argument("fastq_files", action="store", type=ap.FileType('r'), nargs='+',
+                           help="At least one Illumina fastq format file to process")
+
+    return argparser.parse_args()
 
 
 def average(lines, start, stop, output_queue):
@@ -120,15 +125,19 @@ def calculate_final_average(queue):
     return results
 
 
-def main(file_name):
+def main():
+    # Get args
+    args = argument_parser()
+    n_cpus = args.n
+    file_names = args.fastq_files
     # Get lines
-    lines, numb_of_lines = read_file(file_name)
+    lines, numb_of_lines = read_file(file_names)
     # Multiprocess
-    averages = multiprocess(lines, numb_of_lines)
+    averages = multiprocess(lines, numb_of_lines, n_cpus)
     # Finalize
     print(calculate_final_average(averages))
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main("test.fastq"))
+    sys.exit(main())
