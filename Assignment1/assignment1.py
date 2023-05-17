@@ -131,7 +131,10 @@ def main():
     # Verzamel command line arguments
     args = argument_parser()
     fastq_files = args.fastq_files
-    ouput_file_name = args.csvfile.name
+    if args.csvfile is None:
+        ouput_file_name = None
+    else:
+        ouput_file_name = args.csvfile.name
     use_cores = args.n
     # Loop door de files
     for fastq_file in fastq_files:
