@@ -23,16 +23,33 @@ def argument_parser() -> ap.Namespace:
     Gebruik .[argument] om de argumenten terug te krijgen op naam.
     """
 
-    argparser = ap.ArgumentParser(description="Script voor Opdracht 1 van Big Data Computing")
-    argparser.add_argument("-n", action="store",
-                           dest="n", required=True, type=int,
-                           help="Aantal cores om te gebruiken.")
-    argparser.add_argument("-o", action="store", dest="csvfile", required=False,
-                           type=ap.FileType('w', encoding='UTF-8'),
-                           help="CSV file om de output in op te slaan." \
-                           "Default is output naar terminal STDOUT")
-    argparser.add_argument("fastq_files", action="store", type=ap.FileType('r'), nargs='+',
-                           help="Minstens 1 Illumina Fastq Format file om te verwerken")
+    argparser = ap.ArgumentParser(
+        description="Script voor Opdracht 1 van Big Data Computing"
+    )
+    argparser.add_argument(
+        "-n",
+        action="store",
+        dest="n",
+        required=True,
+        type=int,
+        help="Aantal cores om te gebruiken.",
+    )
+    argparser.add_argument(
+        "-o",
+        action="store",
+        dest="csvfile",
+        required=False,
+        type=ap.FileType("w", encoding="UTF-8"),
+        help="CSV file om de output in op te slaan."
+        "Default is output naar terminal STDOUT",
+    )
+    argparser.add_argument(
+        "fastq_files",
+        action="store",
+        type=ap.FileType("r"),
+        nargs="+",
+        help="Minstens 1 Illumina Fastq Format file om te verwerken",
+    )
 
     return argparser.parse_args()
 
@@ -57,14 +74,12 @@ def parse_average_phred_scores_from_lines(quality_lines: list[str]) -> list[floa
                 total_phred[i] += ord(char) - 33
             except IndexError:
                 total_phred.append(ord(char) - 33)
-
     # Bereken de gemiddelde PHRED score per kolom en return deze
     average_phred_scores = [phred / amount_of_lines for phred in total_phred]
     return average_phred_scores
 
 
-
-def parse_fastq_file(fastq_file: ap.FileType('r')) -> list[str]:
+def parse_fastq_file(fastq_file: ap.FileType("r")) -> list[str]:
     """
     Deze functie leest een fastq_bestand in en slaat de quality lines op in een lijst.
     :param fastq_file: Het fastq_bestand om in te lezen
@@ -73,13 +88,10 @@ def parse_fastq_file(fastq_file: ap.FileType('r')) -> list[str]:
     quality_lines = []
 
     with open(fastq_file.name, "r", encoding="UTF-8") as fastq:
-        count = 1
-        for line in fastq:
-            if count % 4 == 0:
+        for linenr, line in enumerate(fastq, start=1):
+            if linenr % 4 == 0:
                 # Sla de quality line op
                 quality_lines.append(line.strip())
-            count += 1
-
     return quality_lines
 
 
@@ -115,9 +127,10 @@ def multi_processing(quality_lines: list[str], n: int) -> list[float]:
     with mp.Pool(n) as pool:  # pylint: disable=no-member
         # Gebruik de pool.map functie om de PHRED scores te berekenen voor elk deel van de quality lines
         results = pool.map(parse_average_phred_scores_from_lines, split_quality_lines)
-
     # Combineer de resultaten van de processen
-    total_phred_scores = [sum(x) for x in zip(*results)]  # De zip functie combineert de resultaten per kolom
+    total_phred_scores = [
+        sum(x) for x in zip(*results)
+    ]  # De zip functie combineert de resultaten per kolom
     phred_scores = [total / n for total in total_phred_scores]
 
     return phred_scores
@@ -150,7 +163,6 @@ def main():
                 # Voeg de bestandsnaam toe aan de output wanneer er meerdere bestanden zijn
                 ouput_file_name = f"{fastq_file.name}.{ouput_file_name}"
             write_output(ouput_file_name, phred_scores)
-
     return 0
 
 
