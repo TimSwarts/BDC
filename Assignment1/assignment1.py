@@ -6,10 +6,11 @@ Opdracht 1: Big Data Computing
 """
 
 
-import argparse as ap
-import multiprocessing as mp
 import sys
 import csv
+import argparse as ap
+import multiprocessing as mp
+import numpy as np
 
 
 __author__ = "Tim Swarts"
@@ -54,44 +55,40 @@ def argument_parser() -> ap.Namespace:
     return argparser.parse_args()
 
 
-def parse_average_phred_scores_from_lines(quality_lines: list[str]) -> list[float]:
+def parse_average_phred_scores_from_lines(quality_lines: list[str]) -> np.array:
     """
-    Deze functie parsed de PHRED scores uit meegegeven quality lines en bereken de gemiddelde PHRED score per kolom.
+    Deze functie parsed de PHRED scores uit meegegeven quality lines
+    en berekend de gemiddelde PHRED score per kolom.
     Deze gemiddelde PHRED scores worden teruggegeven met de pool queue.
     :param lines: De quality lines om te parsen. Deze zijn al eerder gelezen uit de input file(s).
-    :return phred_scores: Een lijst met gemiddelde PHRED scores per kolom.
+    :return phred_scores: Een numpy array met gemiddelde PHRED scores per kolom.
     """
 
-    # Maak een lijst met de totale PHRED scores per kolom
-    total_phred = [0 for _ in range(len(quality_lines[0]))]
+    # Maak een lijst, of in dit geval numpy array, met de totale PHRED scores per kolom, start met 0
+    total_phred = np.zeros(len(quality_lines[0]), dtype=int)
     # Sla het aantal quality lines op
     amount_of_lines = len(quality_lines)
 
     for line in quality_lines:
-        # Loop door de quality line en bereken de gemiddelde PHRED score per kolom
-        for i, char in enumerate(line):
-            try:
-                total_phred[i] += ord(char) - 33
-            except IndexError:
-                total_phred.append(ord(char) - 33)
+        # Bereken de PHRED score per base en tel deze op bij de totale PHRED score per kolom
+        total_phred += np.array([ord(char) - 33 for char in line])
+
     # Bereken de gemiddelde PHRED score per kolom en return deze
-    average_phred_scores = [phred / amount_of_lines for phred in total_phred]
+    average_phred_scores = total_phred / amount_of_lines
     return average_phred_scores
 
 
 def parse_fastq_file(fastq_file: ap.FileType("r")) -> list[str]:
     """
-    Deze functie leest een fastq_bestand in en slaat de quality lines op in een lijst.
-    :param fastq_file: Het fastq_bestand om in te lezen
+    Deze functie leest een FASTQ-bestand in en slaat de quality lines op in een lijst.
+    :param fastq_file: Het FASTQ-bestand om in te lezen
     :return quality_lines: Een lijst met quality lines.
     """
+    # Maak een lege lijst aan om de quality lines in op te slaan
     quality_lines = []
 
-    with open(fastq_file.name, "r", encoding="UTF-8") as fastq:
-        for linenr, line in enumerate(fastq, start=1):
-            if linenr % 4 == 0:
-                # Sla de quality line op
-                quality_lines.append(line.strip())
+    with fastq_file as fastq:
+        quality_lines = [line.strip() for i, line in enumerate(fastq, start=1) if i % 4 == 0]
     return quality_lines
 
 
@@ -100,38 +97,33 @@ def write_output(output_file_name: str, phred_scores: list[float]):
     Deze functie schrijft de gemiddelde PHRED scores naar een output csv bestand.
     :param output_file: Het output bestand om naar te schrijven.
     """
-    with open(output_file_name, "w", newline="") as csvfile:
+    with open(output_file_name, "w", newline="", encoding="utf-8") as csvfile:
         # Creëer een csv writer
         csv_writer = csv.writer(csvfile, delimiter=",")
-        # Schrijf de header
-        header = ["Base Position", "Average PHRED Score"]
-        csv_writer.writerow(header)
 
         # Schrijf de PHRED scores
         for i, phred_score in enumerate(phred_scores):
-            row = [i + 1, phred_score]
+            row = [i, phred_score]
             csv_writer.writerow(row)
 
 
-def multi_processing(quality_lines: list[str], n: int) -> list[float]:
+def multi_processing(quality_lines: list[list[str]], cores: int) -> np.array:
     """
     Deze functie verdeeld de quality lines over de cores die meegegeven zijn.
     :param quality_lines: De quality lines om te verdelen.
-    :param n: Het aantal cores om te gebruiken.
-    :return phred_scores: Een lijst met gemiddelde PHRED scores per kolom.
+    :param cores: Het aantal cores om te gebruiken.
+    :return phred_scores: Een numpy array met gemiddelde PHRED scores per kolom.
     """
     # Split de quality_lines in n gelijke delen
-    split_quality_lines = [quality_lines[i::n] for i in range(n)]
+    split_quality_lines = [quality_lines[i::cores] for i in range(cores)]
 
     # Maak een pool aan met n processen
-    with mp.Pool(n) as pool:  # pylint: disable=no-member
-        # Gebruik de pool.map functie om de PHRED scores te berekenen voor elk deel van de quality lines
+    with mp.Pool(cores) as pool:  # pylint: disable=no-member
+        # Gebruik de pool.map functie om de PHRED scores te berekenen voor alle chunks
         results = pool.map(parse_average_phred_scores_from_lines, split_quality_lines)
     # Combineer de resultaten van de processen
-    total_phred_scores = [
-        sum(x) for x in zip(*results)
-    ]  # De zip functie combineert de resultaten per kolom
-    phred_scores = [total / n for total in total_phred_scores]
+    total_phred_scores = np.sum(results, axis=0)
+    phred_scores = [total / cores for total in total_phred_scores]
 
     return phred_scores
 
