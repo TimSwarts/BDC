@@ -10,6 +10,8 @@ import sys
 import csv
 import argparse as ap
 import multiprocessing as mp
+from io import TextIOWrapper
+from pathlib import Path
 import numpy as np
 
 
@@ -40,14 +42,14 @@ def argument_parser() -> ap.Namespace:
         action="store",
         dest="csvfile",
         required=False,
-        type=str,
+        type=Path,
         help="CSV file om de output in op te slaan."
         "Default is output naar terminal STDOUT",
     )
     argparser.add_argument(
         "fastq_files",
         action="store",
-        type=ap.FileType("r"),
+        type=Path,
         nargs="+",
         help="Minstens 1 Illumina Fastq Format file om te verwerken",
     )
@@ -55,7 +57,7 @@ def argument_parser() -> ap.Namespace:
     return argparser.parse_args()
 
 
-def parse_average_phred_scores_from_lines(quality_lines: list[str]) -> np.array:
+def parse_average_phred_scores_from_lines(quality_lines: list[list[str]]) -> np.ndarray:
     """
     Deze functie parsed de PHRED scores uit meegegeven quality lines
     en berekend de gemiddelde PHRED score per kolom.
@@ -78,7 +80,7 @@ def parse_average_phred_scores_from_lines(quality_lines: list[str]) -> np.array:
     return average_phred_scores
 
 
-def parse_fastq_file(fastq_file: ap.FileType("r")) -> list[str]:
+def parse_fastq_file(fastq_file: Path) -> list[str]:
     """
     Deze functie leest een FASTQ-bestand in en slaat de quality lines op in een lijst.
     :param fastq_file: Het FASTQ-bestand om in te lezen
@@ -87,17 +89,17 @@ def parse_fastq_file(fastq_file: ap.FileType("r")) -> list[str]:
     # Maak een lege lijst aan om de quality lines in op te slaan
     quality_lines = []
 
-    with fastq_file as fastq:
+    with open(fastq_file, mode="r", encoding="utf-8") as fastq:
         quality_lines = [line.strip() for i, line in enumerate(fastq, start=1) if i % 4 == 0]
     return quality_lines
 
 
-def write_output_to_csv(output_file_name: str, phred_scores: list[float]):
+def write_output_to_csv(output_file_path: Path, phred_scores: list[float]):
     """
     Deze functie schrijft de gemiddelde PHRED scores naar een output csv bestand.
     :param output_file: Het output bestand om naar te schrijven.
     """
-    with open(output_file_name, "w", newline="", encoding="utf-8") as csvfile:
+    with open(output_file_path, "w", newline="", encoding="utf-8") as csvfile:
         # Creëer een csv writer
         csv_writer = csv.writer(csvfile, delimiter=",")
 
@@ -107,7 +109,7 @@ def write_output_to_csv(output_file_name: str, phred_scores: list[float]):
             csv_writer.writerow(row)
 
 
-def multi_processing(quality_lines: list[list[str]], cores: int) -> np.array:
+def multi_processing(quality_lines: list[list[str]], cores: int) -> np.ndarray:
     """
     Deze functie verdeeld de quality lines over de cores die meegegeven zijn.
     :param quality_lines: De quality lines om te verdelen.
@@ -128,12 +130,11 @@ def multi_processing(quality_lines: list[list[str]], cores: int) -> np.array:
     return phred_scores
 
 
-def write_output_to_terminal(fastq_file_name, phred_scores: list[float]):
+def write_output_to_terminal(phred_scores: list[float]):
     """
     Deze functie schrijft de gemiddelde PHRED scores naar de terminal.
     :param phred_scores: De gemiddelde PHRED scores om te schrijven.
     """
-    print(fastq_file_name)
     # Schrijf de PHRED scores
     for i, phred_score in enumerate(phred_scores):
         print(f"{i},{phred_score}")
@@ -147,7 +148,7 @@ def main():
     # Verzamel command line arguments
     args = argument_parser()
     fastq_files = args.fastq_files
-    ouput_file_name = args.csvfile
+    output_file_path = args.csvfile
     use_cores = args.n
     # Loop door de files
     for fastq_file in fastq_files:
@@ -156,13 +157,16 @@ def main():
         # Bereken de gemiddelde PHRED scores in parrallel
         phred_scores = multi_processing(quality_lines, use_cores)
         # Schrijf de output naar een bestand of naar de terminal
-        if ouput_file_name is None:
-            write_output_to_terminal(fastq_file.name, phred_scores)
+        if output_file_path is None:
+            if len(fastq_files) > 1:
+                print(f"{fastq_file.name}")
+            write_output_to_terminal(phred_scores)
         else:
             if len(fastq_files) > 1:
                 # Voeg de bestandsnaam toe aan de output wanneer er meerdere bestanden zijn
-                ouput_file_name = f"{fastq_file.name}.{ouput_file_name}"
-            write_output_to_csv(ouput_file_name, phred_scores)
+                output_file_path = output_file_path.parent.joinpath(f"{fastq_file.name}. \
+                                                                    {output_file_path.name}")
+            write_output_to_csv(output_file_path, phred_scores)
     return 0
 
 
