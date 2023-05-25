@@ -40,7 +40,7 @@ def argument_parser() -> ap.Namespace:
         action="store",
         dest="csvfile",
         required=False,
-        type=ap.FileType("w", encoding="UTF-8"),
+        type=str,
         help="CSV file om de output in op te slaan."
         "Default is output naar terminal STDOUT",
     )
@@ -92,7 +92,7 @@ def parse_fastq_file(fastq_file: ap.FileType("r")) -> list[str]:
     return quality_lines
 
 
-def write_output(output_file_name: str, phred_scores: list[float]):
+def write_output_to_csv(output_file_name: str, phred_scores: list[float]):
     """
     Deze functie schrijft de gemiddelde PHRED scores naar een output csv bestand.
     :param output_file: Het output bestand om naar te schrijven.
@@ -128,6 +128,17 @@ def multi_processing(quality_lines: list[list[str]], cores: int) -> np.array:
     return phred_scores
 
 
+def write_output_to_terminal(fastq_file_name, phred_scores: list[float]):
+    """
+    Deze functie schrijft de gemiddelde PHRED scores naar de terminal.
+    :param phred_scores: De gemiddelde PHRED scores om te schrijven.
+    """
+    print(fastq_file_name)
+    # Schrijf de PHRED scores
+    for i, phred_score in enumerate(phred_scores):
+        print(f"{i},{phred_score}")
+
+
 def main():
     """
     Main functie van het script, hierin worden de command line arguments opgehaald en verwerkt.
@@ -136,10 +147,7 @@ def main():
     # Verzamel command line arguments
     args = argument_parser()
     fastq_files = args.fastq_files
-    if args.csvfile is None:
-        ouput_file_name = None
-    else:
-        ouput_file_name = args.csvfile.name
+    ouput_file_name = args.csvfile
     use_cores = args.n
     # Loop door de files
     for fastq_file in fastq_files:
@@ -149,12 +157,12 @@ def main():
         phred_scores = multi_processing(quality_lines, use_cores)
         # Schrijf de output naar een bestand of naar de terminal
         if ouput_file_name is None:
-            print(f"Gemmidelde PHRED scores voor {fastq_file.name}: {phred_scores}")
+            write_output_to_terminal(fastq_file.name, phred_scores)
         else:
             if len(fastq_files) > 1:
                 # Voeg de bestandsnaam toe aan de output wanneer er meerdere bestanden zijn
                 ouput_file_name = f"{fastq_file.name}.{ouput_file_name}"
-            write_output(ouput_file_name, phred_scores)
+            write_output_to_csv(ouput_file_name, phred_scores)
     return 0
 
 
