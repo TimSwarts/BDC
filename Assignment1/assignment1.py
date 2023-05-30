@@ -19,7 +19,7 @@ __author__ = "Tim Swarts"
 __version__ = "1.0"
 
 
-def argument_parser() -> ap.Namespace:
+def argument_parser() -> ap.ArgumentParser:
     """
     Argument parser voor de command line arguments.
     :return argparse.parse_args(): Dit is een object met de command line arguments.
