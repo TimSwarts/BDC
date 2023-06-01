@@ -65,18 +65,37 @@ def parse_average_phred_scores_from_lines(quality_lines: list[list[str]]) -> np.
     :param lines: De quality lines om te parsen. Deze zijn al eerder gelezen uit de input file(s).
     :return phred_scores: Een numpy array met gemiddelde PHRED scores per kolom.
     """
+    if not quality_lines:
+        return np.array([])
+    # Start with an empty array with arbitrary large size
+    matrix_width = len(quality_lines[0])
+    matrix_height = len(quality_lines)
+    all_phred_scores = np.full((matrix_height, matrix_width), np.nan)
 
-    # Maak een lijst, of in dit geval numpy array, met de totale PHRED scores per kolom, start met 0
-    total_phred = np.zeros(len(quality_lines[0]), dtype=int)
-    # Sla het aantal quality lines op
-    amount_of_lines = len(quality_lines)
+    # Loop over the quality lines
+    for i, line in enumerate(quality_lines):
+        # Loop over the characters in the line
+        j = 0
+        while j < len(line):
+            char = line[j]
+            # Check if the total_phred array is large enough
+            try:
+                all_phred_scores[i, j] = ord(char) - 33
+                j += 1
+            except IndexError:
+                # If the index is out of bounds, increase the size of the array
+                matrix_width += 1
+                larger_matrix = np.full((matrix_height, matrix_width), np.nan)
+                larger_matrix[:all_phred_scores.shape[0], :all_phred_scores.shape[1]] = all_phred_scores
+                all_phred_scores = larger_matrix
 
-    for line in quality_lines:
-        # Bereken de PHRED score per base en tel deze op bij de totale PHRED score per kolom
-        total_phred += np.array([ord(char) - 33 for char in line])
-
-    # Bereken de gemiddelde PHRED score per kolom en return deze
-    average_phred_scores = total_phred / amount_of_lines
+    # Calculate the average PHRED scores
+    if np.isnan(all_phred_scores).all():
+        print(f"No valid PHRED scores found in quality lines: {quality_lines}")
+        average_phred_scores = np.array([])
+    else:
+        average_phred_scores = np.nanmean(all_phred_scores, axis=0)
+        # print(f"Average PHRED scores: {average_phred_scores}")
     return average_phred_scores
 
 
@@ -109,6 +128,12 @@ def write_output_to_csv(output_file_path: Path, phred_scores: list[float]):
             csv_writer.writerow(row)
 
 
+def split_into_chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
+
 def multi_processing(quality_lines: list[list[str]], cores: int) -> np.ndarray:
     """
     Deze functie verdeeld de quality lines over de cores die meegegeven zijn.
@@ -116,6 +141,11 @@ def multi_processing(quality_lines: list[list[str]], cores: int) -> np.ndarray:
     :param cores: Het aantal cores om te gebruiken.
     :return phred_scores: Een numpy array met gemiddelde PHRED scores per kolom.
     """
+    # Do not create more processes than there are quality lines
+    cores = min(cores, len(quality_lines))
+    if cores < 1:
+        return np.array([])
+
     # Split de quality_lines in n gelijke delen
     split_quality_lines = [quality_lines[i::cores] for i in range(cores)]
 
@@ -123,11 +153,17 @@ def multi_processing(quality_lines: list[list[str]], cores: int) -> np.ndarray:
     with mp.Pool(cores) as pool:  # pylint: disable=no-member
         # Gebruik de pool.map functie om de PHRED scores te berekenen voor alle chunks
         results = pool.map(parse_average_phred_scores_from_lines, split_quality_lines)
+
+    # Pad all results arrays to the same size before summing them up
+    max_len = max(result.shape[0] for result in results)
+    padded_results = [np.pad(result, (0, max_len - result.shape[0]), constant_values=np.nan) for result in results]
+
     # Combineer de resultaten van de processen
-    total_phred_scores = np.sum(results, axis=0)
+    total_phred_scores = np.nansum(padded_results, axis=0)
     phred_scores = [total / cores for total in total_phred_scores]
 
     return phred_scores
+
 
 
 def write_output_to_terminal(phred_scores: list[float]):
@@ -164,8 +200,7 @@ def main():
         else:
             if len(fastq_files) > 1:
                 # Voeg de bestandsnaam toe aan de output wanneer er meerdere bestanden zijn
-                output_file_path = output_file_path.parent.joinpath(f"{fastq_file.name}. \
-                                                                    {output_file_path.name}")
+                output_file_path = output_file_path.parent.joinpath(f"{fastq_file.name}.{output_file_path.name}")
             write_output_to_csv(output_file_path, phred_scores)
     return 0
 
