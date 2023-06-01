@@ -128,12 +128,6 @@ def write_output_to_csv(output_file_path: Path, phred_scores: list[float]):
             csv_writer.writerow(row)
 
 
-def split_into_chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
-
-
 def multi_processing(quality_lines: list[list[str]], cores: int) -> np.ndarray:
     """
     Deze functie verdeeld de quality lines over de cores die meegegeven zijn.
@@ -141,10 +135,6 @@ def multi_processing(quality_lines: list[list[str]], cores: int) -> np.ndarray:
     :param cores: Het aantal cores om te gebruiken.
     :return phred_scores: Een numpy array met gemiddelde PHRED scores per kolom.
     """
-    # Do not create more processes than there are quality lines
-    cores = min(cores, len(quality_lines))
-    if cores < 1:
-        return np.array([])
 
     # Split de quality_lines in n gelijke delen
     split_quality_lines = [quality_lines[i::cores] for i in range(cores)]
@@ -154,12 +144,8 @@ def multi_processing(quality_lines: list[list[str]], cores: int) -> np.ndarray:
         # Gebruik de pool.map functie om de PHRED scores te berekenen voor alle chunks
         results = pool.map(parse_average_phred_scores_from_lines, split_quality_lines)
 
-    # Pad all results arrays to the same size before summing them up
-    max_len = max(result.shape[0] for result in results)
-    padded_results = [np.pad(result, (0, max_len - result.shape[0]), constant_values=np.nan) for result in results]
-
     # Combineer de resultaten van de processen
-    total_phred_scores = np.nansum(padded_results, axis=0)
+    total_phred_scores = np.nansum(results, axis=0)
     phred_scores = [total / cores for total in total_phred_scores]
 
     return phred_scores
