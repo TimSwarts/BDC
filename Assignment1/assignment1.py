@@ -60,7 +60,7 @@ def argument_parser() -> ap.ArgumentParser:
 
 
 def fastq_quality_line_generator(filepath):
-    with open(filepath, 'r') as fastq_file:
+    with open(filepath, 'rb') as fastq_file:
         # Skip the first 3 lines and then yield every 4th line
         for line in itertools.islice(fastq_file, 3, None, 4):
             yield line.strip()
@@ -132,7 +132,7 @@ def parse_average_phred_scores_from_lines(data_chunk: Dict[str, str | list[str]]
     # Loop over the quality lines
     for i, line in enumerate(quality_lines):
         for j, char in enumerate(line):
-            all_phred_scores[i, j] = ord(char)
+            all_phred_scores[i, j] = char
 
     all_phred_scores -= 33
 
@@ -156,16 +156,7 @@ def multi_processing(data, cores: int, file_paths: list[Path], output_file_path)
         # Gebruik de pool.map functie om de PHRED scores te berekenen voor alle chunks
         results = pool.map(parse_average_phred_scores_from_lines, data)
 
-    # # Combineer de resultaten van de processen
-    # per_file_results = {}
-    # for result in results:
-    #     file_name, phred_sum, phred_count = result
-    #     if file_name not in per_file_results:
-    #         per_file_results[file_name] = [phred_sum, phred_count]
-    #     else:
-    #         per_file_results[file_name][0] += phred_sum
-    #         per_file_results[file_name][1] += phred_count
-    
+
     for fastq_file in file_paths:
         all_sum_arrays = [result[1] for result in results if result[0] == fastq_file]
         all_count_arrays = [result[2] for result in results if result[0] == fastq_file]
