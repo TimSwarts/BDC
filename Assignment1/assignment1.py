@@ -182,6 +182,17 @@ def multi_processing(
     with mp.Pool(processes) as pool:  # pylint: disable=no-member
         # Use pool map to parallelise the calculation of the sums of phred scores per base position
         results = pool.map(phred_sum_parser, data)
+        # Post processing
+        post_processing(results, file_paths, output_file_path)
+
+
+def post_processing(results: List[Tuple], file_paths: List[Path], output_file_path: Path) -> None:
+    """
+    This function post processes the results of the multi-processing.
+    :param results: A list of tuples containing file path, sum of phred scores and count of scores.
+    :param file_paths: Paths of the FastQ files.
+    :param output_file_path: Path of the output file.
+    """
     # Fetch the results per file
     for fastq_file in file_paths:
         # Merge all sum and count arrays
@@ -205,7 +216,9 @@ def multi_processing(
                 full_output_file_path = output_file_path.parent.joinpath(
                     f"{fastq_file.name}.{output_file_path.name}"
                 )
-            write_output_to_csv(full_output_file_path, average_phred_scores)
+                write_output_to_csv(full_output_file_path)
+            else:
+                write_output_to_csv(output_file_path, average_phred_scores)
 
 
 def array_concatenator(array_list: List[np.ndarray]) -> np.ndarray:
