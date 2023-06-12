@@ -216,7 +216,7 @@ def post_processing(results: List[Tuple], file_paths: List[Path], output_file_pa
                 full_output_file_path = output_file_path.parent.joinpath(
                     f"{fastq_file.name}.{output_file_path.name}"
                 )
-                write_output_to_csv(full_output_file_path)
+                write_output_to_csv(full_output_file_path, average_phred_scores)
             else:
                 write_output_to_csv(output_file_path, average_phred_scores)
 
