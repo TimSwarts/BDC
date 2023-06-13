@@ -102,8 +102,7 @@ def phred_sum_parser(
     # Loop over the quality lines
     for i, line in enumerate(parsing_iterator):
         for j, char in enumerate(line):
-            all_phred_scores[i, j] = char
-    all_phred_scores -= 33
+            all_phred_scores[i, j] = char - 33
 
     # Calculate sum of all columns and the amount of non-zero entries
     chunk_phred_sum = np.sum(all_phred_scores, axis=0)
