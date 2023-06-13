@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""    
+"""
 Assignment 3: Big Data Computing
 """
 
@@ -8,9 +8,9 @@ __author__ = "Tim Swarts"
 __version__ = "0.1"
 
 import sys
-import itertools
-import numpy as np
 import argparse
+import numpy as np
+
 
 
 def argument_parser() -> argparse.Namespace:
