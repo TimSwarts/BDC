@@ -12,7 +12,6 @@ import argparse
 import numpy as np
 
 
-
 def argument_parser() -> argparse.Namespace:
     """create an argument parser object
     return parser.parse_args(): an argument parser object that contains the parsed arguments.

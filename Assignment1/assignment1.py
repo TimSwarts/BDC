@@ -4,7 +4,6 @@
 Assignment 1: Big Data Computing
 """
 
-
 import sys
 import csv
 import argparse as ap
@@ -14,7 +13,6 @@ from typing import Generator, List, Tuple
 import itertools
 import numpy as np
 
-
 __author__ = "Tim Swarts"
 __version__ = "1.0"
 
@@ -22,7 +20,8 @@ __version__ = "1.0"
 def argument_parser() -> ap.Namespace:
     """
     Argument parser for the command line arguments.
-    :return ap.Namespace: An object with the command line arguments. Use .[argument] to retrieve the arguments by name.
+    :return ap.Namespace: An object with the command line arguments.
+    Use .[argument] to retrieve the arguments by name.
     """
 
     argparser = ap.ArgumentParser(
@@ -103,10 +102,10 @@ def phred_sum_parser(
     for i, line in enumerate(parsing_iterator):
         for j, char in enumerate(line):
             all_phred_scores[i, j] = char
-        
+
     all_phred_scores[np.nonzero(all_phred_scores)] -= 33
 
-    # Calculate sum of all columns and the amount of non-zero entries
+    # Calculate sum of all columns and amount of non-zero entries
     chunk_phred_sum = np.sum(all_phred_scores, axis=0)
     chunk_phred_count = np.count_nonzero(all_phred_scores, axis=0)
 

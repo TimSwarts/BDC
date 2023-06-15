@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 """
 Assignment 2: Big Data Computing
 Made in python 3.10.8
@@ -12,10 +11,8 @@ Usage:
         assignment2.py -c --host <server host> --port <server port> --n <number of cpus in client pc>
 """
 
-
 __author__ = "Tim Swarts"
 __version__ = "1.0"
-
 
 import multiprocessing as mp
 from multiprocessing.managers import BaseManager
@@ -28,7 +25,6 @@ import sys
 ASSIGNMENT1_PATH = str(Path(__file__).parent.parent.joinpath("Assignment1"))
 sys.path.append(ASSIGNMENT1_PATH)
 from assignment1 import get_chunks, post_processing, phred_sum_parser
-
 
 AUTHKEY = b"brawlhallaspielen"
 POISONPILL = "KO"
