@@ -86,7 +86,6 @@ def phred_sum_parser() -> tuple[np.ndarray, np.ndarray]:
 
 def main() -> int:
     """Main function"""
-    # print(f"New python instance started with chunk of {sum(1 for _ in quality_line_generator())} quality lines")
     # Parse arguments
     args = argument_parser()
     if args.chunk_parser:
@@ -100,7 +99,7 @@ def main() -> int:
         sum_array_list = []
         count_array_list = []
         with sys.stdin as input_lines:
-            # Loop over the lines in and add them to the correct list
+            # Loop over the lines and add them to the correct list
             for line in input_lines:
                 if line.startswith("sum:"):
                     # Parse the sums to a numpy array and add it to the list
