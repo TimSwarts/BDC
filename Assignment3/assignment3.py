@@ -15,7 +15,7 @@ import numpy as np
 
 def argument_parser() -> argparse.Namespace:
     """create an argument parser object
-    return parser.pasre_args(): an argument parser object that contains the parsed arguments.
+    return parser.parse_args(): an argument parser object that contains the parsed arguments.
     """
     parser = argparse.ArgumentParser(
         description="Script for Assignment 3 of Big Data Computing. Should be run from GNU parallel command."
