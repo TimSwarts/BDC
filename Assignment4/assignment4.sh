@@ -10,10 +10,8 @@
 
 export FILE="/commons/Themas/Thema12/HPC/rnaseq.fastq";
 
-echo "start of script, loading conda env";
+
 source /commons/conda/conda_load.sh;
 
 
-
-echo "starting mpi call now";
 mpiexec -n 5 python3 assignment4.py $FILE
