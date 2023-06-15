@@ -187,7 +187,7 @@ def multi_processing(
         post_processing(results, file_paths, output_file_path)
 
 
-def post_processing(results: List[Tuple], file_paths: List[Path], output_file_path: Path) -> None:
+def post_processing(results: List[Tuple], file_paths: List[Path], output_file_path: Path = None) -> None:
     """
     This function post processes the results of the multi-processing.
     :param results: A list of tuples containing file path, sum of phred scores and count of scores.
