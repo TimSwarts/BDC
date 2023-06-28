@@ -17,7 +17,8 @@ def argument_parser() -> argparse.Namespace:
     return parser.parse_args(): an argument parser object that contains the parsed arguments.
     """
     parser = argparse.ArgumentParser(
-        description="Script for Assignment 3 of Big Data Computing. Should be run from GNU parallel command."
+        description="Script for Assignment 3 of Big Data Computing." \
+                    "Should be run from GNU parallel command."
     )
     # Create exclusive group for the two modes
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -57,7 +58,7 @@ def combine_array_list(array_list: list[np.ndarray], is_phred: bool = False) -> 
     Combine a list of numpy arrays of varying lengths into one array (padded with zeros).
     """
     # Get the maximum length of the arrays
-    max_row_length = np.array([len(item) for item in array_list]).max() # max([len(array) for array in array_list])
+    max_row_length = np.array([len(item) for item in array_list]).max()
     # Create an array to store the combined arrays
     combined_array = np.zeros((len(array_list), max_row_length))
     # Loop over the arrays and add them to the combined array

@@ -18,6 +18,8 @@ from assignment1 import get_chunks, post_processing, phred_sum_parser
 COMM = MPI.COMM_WORLD
 RANK = COMM.Get_rank()
 SIZE = COMM.Get_size()
+HOST = MPI.Get_processor_name()
+print(f"rank: {RANK}/{SIZE}, host: {HOST}")
 
 
 def argument_parser() -> argparse.Namespace:
@@ -52,13 +54,13 @@ def main():
         data = get_chunks(args.fastq_files, SIZE)
     else:  # Normal Workers
         data = None
-    # Scatter the chunks
-    data = COMM.scatter(
+    # Scatter the chunks and fetch current rank's chunk
+    rank_data = COMM.scatter(
         data, root=0
-    )  # data is None for normal workers, so receive instead of send
+    )  # data is None for normal workers, so they only receive and don't send
 
-    # Process the chunks
-    processed = phred_sum_parser(data)
+    # Process the chunks for each worker
+    processed = phred_sum_parser(rank_data)
 
     # Gather the results
     results = COMM.gather(processed, root=0)
