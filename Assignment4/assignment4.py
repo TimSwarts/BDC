@@ -19,7 +19,6 @@ COMM = MPI.COMM_WORLD
 RANK = COMM.Get_rank()
 SIZE = COMM.Get_size()
 HOST = MPI.Get_processor_name()
-print(f"rank: {RANK}/{SIZE}, host: {HOST}")
 
 
 def argument_parser() -> argparse.Namespace:
