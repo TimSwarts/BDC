@@ -8,10 +8,10 @@ __author__ = "Tim Swarts"
 __version__ = "0.1"
 
 import sys
+import csv
 from io import StringIO
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import avg, col, count
-import csv
 
 
 # INPUT_PATH = "/homes/tswarts/jaar3.5/BDC/Assignment5/development/data/small.tsv"
@@ -254,7 +254,7 @@ def get_question_9(df):
     :param df: Spark dataframe
     :return: answer to question 9 and the explanation of the pipeline as a string
     """
-    
+
     # Get data frame in correct state
     question_9 = (
         df.withColumn("coverage", df._c7 - df._c6 / df._c2)
