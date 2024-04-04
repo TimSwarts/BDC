@@ -27,7 +27,8 @@ def parse_args() -> argparse.Namespace:
     Use .[argument] to retrieve the arguments by name.
     """
     arg_parser = argparse.ArgumentParser(
-        description="Train a neural network on the MNIST dataset."
+        description="Train a neural network on the MNIST dataset.",
+        usage="python3 assignment6.py [-h] [-c CORES] [-n NUMBER_OF_INSTANCES] [-e EPOCHS_PER_MODEL] [-l LEARNING_RATE] [--validate]"
     )
 
     arg_parser.add_argument(
