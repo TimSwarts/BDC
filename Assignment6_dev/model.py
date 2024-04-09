@@ -19,7 +19,8 @@ def linear(a):
 
 def sign(a):
     """
-    Signum function, this function gives -1 for all negative inputs, 1 for all positive inputs, and 0 for 0.
+    Signum function, this function gives -1 for all negative inputs,
+    1 for all positive inputs, and 0 for 0.
     :param a: preactivation value (float)
     :return: post activation value (float)
     """
@@ -300,8 +301,10 @@ class InputLayer(Layer):
         return text
 
     def set_inputs(self, inputs):
-        raise NotImplementedError("An InputLayer itself can not receive inputs from previous layers,"
-                                  "as it is always the first layer of a network.")
+        raise NotImplementedError(
+            "An InputLayer itself can not receive inputs from previous layers,"
+            "as it is always the first layer of a network."
+        )
 
     def __call__(self, xs, ys=None, alpha=None):
         return self.next(xs, ys, alpha)
@@ -316,21 +319,16 @@ class InputLayer(Layer):
         return lmean
 
     def partial_fit(self, xs, ys, *, alpha=0.001):
-
         # Update the weights and biases and save the loss
         _, ls, _ = self(xs, ys, alpha)
         lmean = sum(ls) / len(ls)
         return lmean
-
 
     def fit(self, xs, ys, *, epochs=1, alpha=0.001, validation_data=None):
         # Initialise loss history dict:
         history = {'loss': []}
         if validation_data is not None:
             history['val_loss'] = []
-
-        # Save the start time
-        start_time = time.time()
 
         # Train data and append history dictionary
         for i in range(epochs):
@@ -339,8 +337,14 @@ class InputLayer(Layer):
             history['loss'].append(loss_of_epoch)
             # If validation data is given, evaluate it and add it to history as well
             if validation_data is not None:
-                history['val_loss'].append(self.evaluate(validation_data[0], validation_data[1]))
-
+                history['val_loss'].append(
+                    self.evaluate(validation_data[0], validation_data[1])
+                )
+            # Print the number and loss of the epoch
+            print(
+                f"\033[1;36;49m \t Network {self.name: >2} has been trained "
+                f"for {i + 1: >2} epoch(s), loss: {loss_of_epoch:.2f} \033[0m"
+            )
         # Return the loss history
         return history
 
@@ -355,30 +359,48 @@ class DenseLayer(Layer):
         self.weights = None
 
     def __repr__(self):
-        text = f'DenseLayer(outputs={self.outputs}, name={repr(self.name)})'
+        text = f"DenseLayer(outputs={self.outputs}, name={repr(self.name)})"
         if self.next is not None:
-            text += ' + ' + repr(self.next)
+            text += " + " + repr(self.next)
         return text
 
     def set_inputs(self, inputs: int):
+        """Sets the number of inputs of this layer and, if not present yet,
+        initialises random weights.
+        """
+        # Set inputs
         self.inputs = inputs
+
+        # Generate uniform random weights for all neurons
         limit = sqrt(6 / (self.inputs + self.outputs))
         if not self.weights:
-            self.weights = [[random.uniform(-limit, limit) for _ in range(self.inputs)] for _ in range(self.outputs)]
+            self.weights = [
+                [random.uniform(-limit, limit) for _ in range(self.inputs)]
+                for _ in range(self.outputs)
+            ]
 
     def __call__(self, xs: list[list[float]], ys=None, alpha=None):
         """
-        xs should be a list of lists of values, where each sublist has a number of values equal to self.inputs
+        xs should be a list of lists of values, where each sublist has a number of
+        values equal to self.inputs
         """
-        aa = []   # Uitvoerwaarden voor alle instances xs (xs is een (nested) lijst met instances)
-        gxs = None # Set gradient from loss to x-input equal to None
+        aa = (
+            []
+        )  # Uitvoerwaarden voor alle instances xs (xs is een (nested) lijst met instances)
+        gxs = None  # Set gradient from loss to x-input equal to None
         for x in xs:
-            a = []   # Uitvoerwaarde voor één instance x (x is een lijst met attributen)
+            a = []  # Uitvoerwaarde voor één instance x (x is een lijst met attributen)
             for o in range(self.outputs):
                 # Bereken voor elk neuron o uit de lijst invoerwaarden x de uitvoerwaarde
-                pre_activation = self.bias[o] + sum(self.weights[o][i] * x[i] for i in range(self.inputs))
-                a.append(pre_activation)  # a is lijst met de output waarden van alle neuronen voor 1 instance
-            aa.append(a)  # aa is een nested lijst met de output waarden van alle instances
+                pre_activation = self.bias[o] + sum(
+                    self.weights[o][i] * x[i] for i in range(self.inputs)
+                )
+                a.append(
+                    pre_activation
+                )  # a is lijst met de output waarden van alle neuronen voor 1 instance
+            aa.append(
+                a
+            )  # aa is een nested lijst met de output waarden van alle instance
 
         # Send to aa next layer, and collect its yhats, ls, and gas
         yhats, ls, gas = self.next(aa, ys, alpha)
@@ -386,18 +408,28 @@ class DenseLayer(Layer):
         if alpha:
             # Initiate empty list
             gxs = []
+
             # Calculate gradient vectors for all instances
             for x, gan in zip(xs, gas):
-                gxn = [sum(self.weights[o][i] * gan[o] for o in range(self.outputs)) for i in range(self.inputs)]
+                gxn = [
+                    sum(self.weights[o][i] * gan[o] for o in range(self.outputs))
+                    for i in range(self.inputs)
+                ]
+
                 # Add instance to list
                 gxs.append(gxn)
+
                 # Update bias and weights per instance
                 for o in range(self.outputs):
-                    # b <- b - alpha/N * xi * d_ln/d_ano (xi for bias = 1, therefore not included)
-                    self.bias[o] = self.bias[o] - alpha/len(xs) * gan[o]
-                    # w <- w - alpha/N * xi * d_ln/d_ano
-                    self.weights[o] = [self.weights[o][i] - alpha/len(xs) * gan[o] * x[i] for i in range(self.inputs)]
 
+                    # b <- b - alpha/N * xi * d_ln/d_ano (xi for bias = 1, therefore not included)
+                    self.bias[o] = self.bias[o] - alpha / len(xs) * gan[o]
+
+                    # w <- w - alpha/N * xi * d_ln/d_ano
+                    self.weights[o] = [
+                        self.weights[o][i] - alpha / len(xs) * gan[o] * x[i]
+                        for i in range(self.inputs)
+                    ]
         return yhats, ls, gxs
 
 
@@ -454,16 +486,18 @@ class LossLayer(Layer):
         return text
 
     def add(self, next):
-        raise NotImplementedError("It is not possible to add a layer to a LossLayer,"
-                                  "since a network should always end with a single LossLayer")
+        raise NotImplementedError(
+            "It is not possible to add a layer to a LossLayer,"
+            "since a network should always end with a single LossLayer"
+        )
 
     def __call__(self, hh, ys=None, alpha=None):
         # yhats is the output of the previous layer, because the loss layer is always last
         yhats = hh
-        # ls, the loss, which will be a list of losses for all outputs in yhats, starts at None
+        # ls will be a list of losses for all outputs in yhats, starts at None
         ls = None
-        # gls, will be list of gradient vectors, one for each instance, with one value for each output of the prev layer
-        # starts None
+        # gls will be list of gradient vectors, one for each instance, with one value
+        # for each output of the prev layer, starts at None
         gls = None
         if ys is not None:
             ls = []
@@ -504,6 +538,8 @@ class SoftmaxLayer(Layer):
         for h in hh:
             prob = softmax(h)   # Probability distribution for one instance
             probs.append(prob)  # Collect all instances
+
+        probs = np.array(probs)
 
         # Send probabilities to the next layer and collect its yhats, ls, and gls
         yhats, ls, gls = self.next(probs, ys, alpha)
