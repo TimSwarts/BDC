@@ -328,14 +328,13 @@ def digits(xs, ys, model=None):
         ax.set_title(t)
     plt.show()
 
-def confusion(xs, ys, model):
+def confusion(xs, ys, yhats):
     """Shows 10x10 confusion matrix.
 
     Keyword arguments:
     xs       -- 144-element lists of pixel values (range 0-1)
     ys       -- 10-element lists of correct digits using one-hot encoding
-    model    -- the classification model
-
+    yhats    -- 10-element lists of predicted digits using one-hot encoding
     Return values:
     None
     """
@@ -349,8 +348,7 @@ def confusion(xs, ys, model):
                 result = n
         return result
     # Compute the confusion matrix
-    yhats = model.predict(xs)
-    matrix = metrics.confusion_matrix([argmax(y) for y in ys], [argmax(yhat) for yhat in yhats], labels=list(range(10)))
+    matrix = metrics.confusion_matrix([argmax(y) for y in ys], [np.argmax(yhat) for yhat in yhats], labels=list(range(10)))
     accuracy = sum(matrix[i][i] for i in range(10)) / len(xs)
     # Plot the confusion matrix
     plt.imshow(matrix, norm=LogNorm(), cmap='Blues', origin='lower')
