@@ -328,7 +328,7 @@ def digits(xs, ys, model=None):
         ax.set_title(t)
     plt.show()
 
-def confusion(xs, ys, yhats):
+def confusion(ys, yhats):
     """Shows 10x10 confusion matrix.
 
     Keyword arguments:
@@ -338,18 +338,18 @@ def confusion(xs, ys, yhats):
     Return values:
     None
     """
-    # Define the argmax helper function
-    def argmax(ls):
-        m = -1.0
-        result = -1
-        for n, l in enumerate(ls):
-            if l > m:
-                m = l
-                result = n
-        return result
+    # # Define the argmax helper function
+    # def argmax(ls):
+    #     m = -1.0
+    #     result = -1
+    #     for n, l in enumerate(ls):
+    #         if l > m:
+    #             m = l
+    #             result = n
+    #     return result
     # Compute the confusion matrix
-    matrix = metrics.confusion_matrix([argmax(y) for y in ys], [np.argmax(yhat) for yhat in yhats], labels=list(range(10)))
-    accuracy = sum(matrix[i][i] for i in range(10)) / len(xs)
+    matrix = metrics.confusion_matrix([np.argmax(y) for y in ys], [np.argmax(yhat) for yhat in yhats], labels=list(range(10)))
+    accuracy = sum(matrix[i][i] for i in range(10)) / ys.shape[0]
     # Plot the confusion matrix
     plt.imshow(matrix, norm=LogNorm(), cmap='Blues', origin='lower')
     plt.grid(True)
@@ -359,4 +359,5 @@ def confusion(xs, ys, yhats):
     plt.xticks(range(10), list(range(10)))
     plt.yticks(range(10), list(range(10)))
     plt.colorbar()
-    plt.show()
+    return plt, accuracy
+    
