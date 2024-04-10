@@ -9,7 +9,7 @@ The predictions are then validated using the test set. This validation
 is either shown or saved to a file, depending on user input.
 
 Usage:
-    assignment6.py 
+    assignment6.py
 
 """
 
@@ -18,16 +18,16 @@ __version__ = "0.0.1"
 __status__ = "Development"
 
 
+import sys
 import argparse
-import random
 import time
 import multiprocessing as mp
 from typing import List, Tuple, Dict, Any
+from pathlib import Path
 from numpy.typing import NDArray
 import numpy as np
 import data
 import model
-from pathlib import Path
 
 
 def init_args() -> argparse.Namespace:
@@ -89,7 +89,7 @@ def init_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-c",	
+        "-c",
         "--cores",
         dest="cores",
         metavar='',
@@ -143,19 +143,19 @@ def parse_args() -> Tuple:
     """Further parse the command line arguments, handling default values and edge cases.
     Returns:
         args: A tuple of parsed arguments.
-    """	
+    """
 
     args = init_args()
 
     # Check if the data size is within the bounds of the dataset
     if args.data_size > 60000:
         print("Data size exceeds the number of instances in the dataset.")
-        exit(1)
+        sys.exit(1)
 
     # Check if the batch size is within the bounds of the dataset
     if args.bag_size > args.data_size:
         print("Batch size exceeds the number of instances in the dataset.")
-        exit(1)
+        sys.exit(1)
 
     # Set the batch size to the data size if it is 0
     if args.bag_size == 0:
@@ -185,14 +185,14 @@ def create_training_data_packages(
     Returns:
         A tuple of of data bags.
     """
-    
+
     indice_count = y_data.shape[0]
     packages = []
 
     for i in range(bag_count):
         # Create a sample of data indices of the given size, allowing duplicates
         indices = np.random.choice(range(indice_count), size=bag_size, replace=True)
-        
+
         packages.append((x_data[indices], y_data[indices], validate, i + 1, epochs))
 
     return packages
@@ -237,8 +237,8 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
         x_train, y_train, x_val, y_val = split_train_test(x_data, y_data, 0.9)
         history = network.fit(
             x_train,
-            y_train, 
-            alpha=alpha, 
+            y_train,
+            alpha=alpha,
             epochs=number_of_epochs,
             validation_data=(x_val, y_val)
         )
@@ -261,7 +261,7 @@ def train_parallel_networks(
     Returns:
         A list of trained networks.
     """
-    
+
     with mp.Pool(cores) as pool:  # pylint: disable=no-member
         networks = pool.map(train_network, data_bags)
 
@@ -317,11 +317,11 @@ def bootstrap_aggregate(
     Args:
         all_network_outputs: numpy arrays of class propabilities for each instance as
         predicted by each network.
-    
+
     Returns:
         A list of final  predictions after aggregating by majority vote.
     """
-    
+
     # Initialise vote tally and list of final predictions
     tally_per_instance = [np.zeros(10) for _ in range(len(all_network_outputs[0]))]
     final_predictions = np.copy(tally_per_instance)
@@ -340,7 +340,7 @@ def bootstrap_aggregate(
 
 
 def evaluate(
-        ys: NDArray[np.float64],
+        ys_data: NDArray[np.float64],
         yhats: List[NDArray[np.float64]],
         output: Path = None
     ) -> None:
@@ -350,7 +350,7 @@ def evaluate(
     location when output is a path.
 
     Args:
-        ys: The actual class labels for the test set.
+        ys_data: The actual class labels for the test set.
         yhats: The final predictions made by the bootstrap aggragated
         ensemble, a list of numpy arrays of class propabilities for each instance.
         number_of_inputs: The number of input values per instance, used in
@@ -359,71 +359,78 @@ def evaluate(
     """
 
     # Create a confusion matrix
-    plt, accuracy = data.confusion(ys, yhats)
+    plt, accuracy = data.confusion(ys_data, yhats)
 
     # Save or show the confusion matrix
     if output:
         plt.savefig(output)
     else:
         plt.show()
-    
+
     print(f"Accuracy = {accuracy*100.0:.1f}%")
 
-    return
 
-
-def split_train_test(xs, ys, train_ratio):
+def split_train_test(xs_data, ys_data, train_ratio):
     """Split the data into training and test sets.
 
     Args:
-        xs: The input data.
-        ys: The target data.
+        xs_data: The input data.
+        ys_data: The target data.
         train_ratio: The ratio of the data to use for training.
 
     Returns:
         A tuple containing the training and test data.
     """
-    
+
     # Shuffle the data
-    indices = np.arange(ys.shape[0])
+    indices = np.arange(ys_data.shape[0])
     np.random.shuffle(indices)
 
     # Split the data
-    split_index = int(ys.shape[0] * train_ratio)
-    train_xs = xs[indices[:split_index]]
-    train_ys = ys[indices[:split_index]]
-    test_xs = xs[indices[split_index:]]
-    test_ys = ys[indices[split_index:]]
+    split_index = int(ys_data.shape[0] * train_ratio)
+    train_xs = xs_data[indices[:split_index]]
+    train_ys = ys_data[indices[:split_index]]
+    test_xs = xs_data[indices[split_index:]]
+    test_ys = ys_data[indices[split_index:]]
 
     return train_xs, train_ys, test_xs, test_ys
 
 
 def main():
+    """Main function of the script, combining all the other functions to train
+    an ensemble of neural networks in parallel on the MNIST dataset. Trained networks
+    are then used to predict a test sets in parallel, after which the predictions are
+    aggragated through majority voting. The final predictions resulting from this
+    are evaluated with a confusion matrix, showing the accuracy of the ensemble.
+
+    Returns:
+        0 if the script runs successfully.
+    """
     args = parse_args()
 
     print(f"Running with arguments:\n\t{args}\nLoading data...")
     # Load the MNIST dataset
-    xs, ys = data.mnist_mini(args.file, num=args.data_size)
+    xs_data, ys_data = data.mnist_mini(args.file, num=args.data_size)
 
     print("Data loaded, converting to numpy arrays...")
     # Turn the data into numpy arrays
-    xs = np.array(xs)
-    ys = np.array(ys)
-    
+    xs_data = np.array(xs_data)
+    ys_data = np.array(ys_data)
+
     print(f"Data converted, splitting off {args.training_ratio * 100}% for training...")
     # Get bags
-    train_xs, train_ys, test_xs, test_ys = split_train_test(xs, ys, args.training_ratio)
+    train_xs, train_ys, test_xs, test_ys = split_train_test(xs_data, ys_data, args.training_ratio)
 
     print(f"Data split, creating {args.network_count} data packages for training...")
     # Create data packages for parallel training
     training_data_packages = create_training_data_packages(
         x_data=train_xs,
         y_data=train_ys,
-        bag_count=args.network_count, 
+        bag_count=args.network_count,
         bag_size=args.bag_size,
         epochs=args.epochs
     )
-    
+
     print(
         f"Data packages created, training {args.network_count} networks in parallel..."
     )
@@ -456,9 +463,9 @@ def main():
     # Aggregate the predictions
     final_predictions = bootstrap_aggregate(predictions)
 
-    print(f"Predictions aggregated, evaluating ensemble performance...")
+    print("Predictions aggregated, evaluating ensemble performance...")
     evaluate(
-        ys=test_ys,
+        ys_data=test_ys,
         yhats=final_predictions,
         output=args.output
     )
@@ -467,4 +474,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
