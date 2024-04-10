@@ -23,4 +23,4 @@ Changes:
 
 * The ``curve`` function has been changed, it now includes options to add a title and to save the plot to a file.
 This was done so that validation curves could be plotted for different parallel models.
-* The ``confusion_matrix`` function has been changed, it now takes in yhats directly instead of predicting them from a given model. It now also uses ``np.argmax`` to get the predicted classes from yhats, instead of the homemade function that was used before.
+* The ``confusion`` function has been changed, it now takes in yhats directly instead of predicting them from a given model. It now also uses ``np.argmax`` to get the predicted classes from yhats, instead of the homemade function that was used before. Furthermore, it no longer shows the created confusion matrix, but instead returns it. This was done so that confusion matrices could be saved to a file. In addition to return the plot, the accuracy is the returned as well. 
