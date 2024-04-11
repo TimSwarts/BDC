@@ -419,7 +419,11 @@ def main():
 
     print(f"Data converted, splitting off {args.training_ratio * 100}% for training...")
     # Get bags
-    train_xs, train_ys, test_xs, test_ys = split_train_test(xs_data, ys_data, args.training_ratio)
+    train_xs, train_ys, test_xs, test_ys = split_train_test(
+        xs_data,
+        ys_data,
+        args.training_ratio
+    )
 
     print(f"Data split, creating {args.network_count} data packages for training...")
     # Create data packages for parallel training
