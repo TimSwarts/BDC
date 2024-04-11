@@ -142,7 +142,8 @@ class Client(mp.Process):
 
     def __run_peons(self, job_q: 'queue.Queue', result_q: 'queue.Queue') -> None:
         """
-        This runs the peons, which are the workers that do the actual work, they are ran in parallel as mp.Process objects.
+        This runs the peons, which are the workers that do the actual work,
+        they are run in parallel as mp.Process objects.
         :param job_q: The queue that contains the jobs to be done.
         :param result_q: The queue that contains the results of the jobs.
         """

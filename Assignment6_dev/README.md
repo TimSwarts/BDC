@@ -10,19 +10,17 @@ by taking a look at ``original_model.py`` and ``model.py``.
 
 Changes:
 
-* Since the batches are now divided on a more global level between the networks, this functionality
-has been stripped from the partial_fit and fit method of InputLayer in the model script.
-* The first few classes of the model script were remnant from earlier exercises in the Advanced Datamining
-course and have been deleted.
+* The mini batch learning implementation has been removed from the from the partial_fit and fit method of InputLayer in the model script.
+* The first few classes of the model script were remnant from earlier exercises in the Advanced Datamining course and have been deleted.
 * Backpropagation has been optimized:
 The derivative of functions are now calculated outside of the
 list comprehensions and loops that use them, to prevent the same calculations from being done multiple times.
 
 ## Changes made to the data script:
-``data.py`` is a module delivered by Dave Langers as part of the Advanced Datamining course.
-It contains functions to load and visualize data. The changes made to this script are listed below.
+``data.py`` is a module delivered by Dave Langers as part of the Advanced Datamining course. It contains functions to load and visualize data. The changes made to this script are listed below.
 
 Changes:
 
 * The ``curve`` function has been changed, it now includes options to add a title and to save the plot to a file.
-This was done so that validation curves could be plotted for different paralel models.
+This was done so that validation curves could be plotted for different parallel models.
+* The ``confusion`` function has been changed, it now takes in yhats directly instead of predicting them from a given model. It now also uses ``np.argmax`` to get the predicted classes from yhats, instead of the homemade function that was used before. Furthermore, it no longer shows the created confusion matrix, but instead returns it. This was done so that confusion matrices could be saved to a file. In addition to return the plot, the accuracy is the returned as well. 

@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 
-"""
-This script splits the MNIST dataset into smaller batches and trains a neural network on each batch.
-These networks are then combined into an ensemble and tested on the test set.
+"""Assignment 6: Ensemble Learning
+
+This script creates so-calls 'bags' of data, using the MNIST dataset, by sampling with
+replacement. It then trains a neural network on each 'bag'. These networks are then used
+to create final predictions on the test set by using a majority voting system.
+The predictions are then validated using the test set. This validation
+is either shown or saved to a file, depending on user input.
+
+Usage:
+    assignment6.py
+
 """
 
 __author__ = "Tim Swarts"
@@ -10,231 +18,464 @@ __version__ = "0.0.1"
 __status__ = "Development"
 
 
+import sys
 import argparse
-import random
-import multiprocessing as mp
-from typing import List, Tuple
 import time
+import multiprocessing as mp
+from typing import List, Tuple, Dict, Any
+from pathlib import Path
+from numpy.typing import NDArray
 import numpy as np
-import data as dt
+import data
 import model
 
 
-def parse_args() -> argparse.Namespace:
+def init_args() -> argparse.Namespace:
+    """Parse command line arguments.
+    Returns:
+        parser: A namespace containing the received arguments.
     """
-    Create an argument parser and return the parsed arguments.
-    :return ap.Namespace: An object with the command line arguments.
-    Use .[argument] to retrieve the arguments by name.
-    """
-    arg_parser = argparse.ArgumentParser(
-        description="Train a neural network on the MNIST dataset.",
-        usage="python3 assignment6.py [-h] [-c CORES] [-n NUMBER_OF_INSTANCES] [-e EPOCHS_PER_MODEL] [-l LEARNING_RATE] [--validate]"
+
+    parser = argparse.ArgumentParser(
+        description="Train an ensemble of neural networks on the MNIST dataset."
     )
 
-    arg_parser.add_argument(
+    parser.add_argument(
+        "-f",
+        "--file",
+        dest="file",
+        metavar='',
+        type=Path,
+        default=Path("./data/MNIST_mini.dat"),
+        required=False,
+        help=
+            "Path to the directory containing the MNIST dataset.\
+            Default is ./data/MNIST_mini.dat."
+    )
+
+    parser.add_argument(
+        "-n",
+        "--network_count",
+        dest="network_count",
+        metavar='',
+        type=int,
+        default=4,
+        required=False,
+        help="Number of networks to train. Default is 4."
+    )
+
+    parser.add_argument(
+        "-s",
+        "--data_size",
+        dest="data_size",
+        metavar='',
+        type=int,
+        default=5000,
+        required=False,
+        help="Number of instances to load from the dataset, max 60000. Default is 5000."
+    )
+
+    parser.add_argument(
+        "-b",
+        "--bag_size",
+        dest="bag_size",
+        metavar='',
+        type=int,
+        default=0,
+        required=False,
+        help=
+            "Number of instances in each batch, if 0,\
+            batch size wil equal the data size. Default is 0."
+    )
+
+    parser.add_argument(
         "-c",
         "--cores",
+        dest="cores",
+        metavar='',
         type=int,
-        default=8,
-        metavar="",
-        help="The number of cores to use."
-             "This will be equal to the number of models trained. Default is 20.",
+        default=4,
+        required=False,
+        help="Number of cores to use for parallel processing. Default is 4."
     )
 
-    arg_parser.add_argument(
-        "-n",
-        "--number-of-instances",
-        type=int,
-        default=17600,
-        metavar="",
-        help="The number of MNIST instances to train on. Default is 17600.",
-    )
-
-    arg_parser.add_argument(
-        "-e",
-        "--epochs-per-model",
-        type=int,
-        default=40,
-        metavar="",
-        help="The number of epochs to train each model for. Default is 21.",
-    )
-
-    arg_parser.add_argument(
-        "-l",
-        "--learning-rate",
+    parser.add_argument(
+        "-t",
+        "--training_ratio",
+        dest="training_ratio",
+        metavar='',
         type=float,
-        default=0.06,
-        metavar="",
-        help="The learning rate to use for training. Default is 0.06.",
+        default=0.8,
+        required=False,
+        help=
+            "Ratio of the data to use for training remaining data is used for testing.\
+            Default is 0.8."
     )
 
-    arg_parser.add_argument(
-        "--validate",
-        action="store_true",
-        help="Add this to validate each model on a validation dataset"
-             " and show the validation curve. Default is False.",
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        dest="output",
+        metavar='',
+        type=Path,
+        default=None,
+        required=False,
+        help="Path to the output file. If none,\
+            output is printed to the console. Default is None."
     )
 
-    return arg_parser.parse_args()
+    parser.add_argument(
+        "-e",
+        "--epochs",
+        dest="epochs",
+        metavar='',
+        type=int,
+        default=30,
+        required=False,
+        help="Number of epochs to train each network for. Default is 30."
+    )
+
+    return parser.parse_args()
 
 
-
-def train_network(data_tuple) -> model.InputLayer:
+def parse_args() -> Tuple:
+    """Further parse the command line arguments, handling default values and edge cases.
+    Returns:
+        args: A tuple of parsed arguments.
     """
-    Train a neural network on the given data.
-    :param data_tuple: A tuple containing:
-                       the data, labels, epochs, learning rate, and name of the network,
-                       and whether to validate the network.
-    :return model.InputLayer: The trained neural network.
+
+    args = init_args()
+
+    # Check if the data size is within the bounds of the dataset
+    if args.data_size > 60000:
+        print("Data size exceeds the number of instances in the dataset.")
+        sys.exit(1)
+
+    # Check if the batch size is within the bounds of the dataset
+    if args.bag_size > args.data_size:
+        print("Batch size exceeds the number of instances in the dataset.")
+        sys.exit(1)
+
+    # Set the batch size to the data size if it is 0
+    if args.bag_size == 0:
+        args.bag_size = args.data_size
+
+    return args
+
+
+def create_training_data_packages(
+        x_data: np.ndarray[np.float64],
+        y_data: np.ndarray[np.float64],
+        bag_count: int,
+        bag_size: int,
+        epochs: int,
+        validate: bool = False
+    ) -> List[Tuple[Any]]:
+    """Creates data packages for parallel network training. It creates the
+    batches (bags) from the input data by sampling with replacement and
+    adds the extra parameters needed for training, such as wehter to validate.
+
+    Args:
+        data: The dataset to sample from,
+        a tuple containing an X (predictors) set and a y (response) variable.
+        sample_count: The number of samples to generate.
+        sample_size: The size of each sample.
+
+    Returns:
+        A tuple of of data bags.
     """
-    data, labels, epochs, learning_rate, name, validation_data = data_tuple
 
-    # Create a neural network
-    my_model = model.InputLayer(144, name=name) + \
-           model.DenseLayer(72) + model.ActivationLayer(72, activation=model.hard_tanh) + \
-           model.DenseLayer(36) + model.ActivationLayer(36, activation=model.swish) + \
-           model.DenseLayer(18) + model.ActivationLayer(18, activation=model.swish) + \
-           model.DenseLayer(10) + model.SoftmaxLayer(10) + \
-           model.LossLayer(loss=model.categorical_crossentropy)
+    indice_count = y_data.shape[0]
+    packages = []
 
-    start_time = time.time()
+    for i in range(bag_count):
+        # Create a sample of data indices of the given size, allowing duplicates
+        indices = np.random.choice(range(indice_count), size=bag_size, replace=True)
 
-    my_history = my_model.fit(data,
-                            labels,
-                            alpha=learning_rate,
-                            epochs=epochs)
-    
-    if validation_data:
-        # Plot the validation curve
-        dt.curve(
-            my_history,
-            title=name,
-            save=True,
-            filename=f"./output/{name}_validation_curve.png"
+        packages.append((x_data[indices], y_data[indices], validate, i + 1, epochs))
+
+    return packages
+
+
+def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]:
+    """Train a neural network on the given data.
+
+    Args:
+        data: A data package containing the data to train the network on, and a boolean
+        indicating whether to validate the network. If validate is True, the data is
+        split into training and validation data. Each data packet thus contains three
+        items: x_data, y_data, and validate.
+
+    Returns:
+        A tuple containing the trained network and the training history.
+    """
+
+    # The hyperparameters used are based on those used in my final assignment of the
+    # Advanced Datamining course, but with the alpha value increased for faster training
+    alpha = 0.3
+
+    x_data, y_data, validate, nework_number, number_of_epochs = training_data_package
+
+    # Create a neural network, this architecture is based on the one used in my final
+    # assignment of the Advanced Datamining course
+    network = (
+        model.InputLayer(144, name=f"{nework_number}")
+        + model.DenseLayer(72)
+        + model.ActivationLayer(72, activation=model.hard_tanh)
+        + model.DenseLayer(36)
+        + model.ActivationLayer(36, activation=model.swish)
+        + model.DenseLayer(18)
+        + model.ActivationLayer(18, activation=model.swish)
+        + model.DenseLayer(10)
+        + model.SoftmaxLayer(10)
+        + model.LossLayer(loss=model.categorical_crossentropy)
+    )
+
+    # Train the network
+    if validate:
+        x_train, y_train, x_val, y_val = split_train_test(x_data, y_data, 0.9)
+        history = network.fit(
+            x_train,
+            y_train,
+            alpha=alpha,
+            epochs=number_of_epochs,
+            validation_data=(x_val, y_val)
         )
-        
-    # Print the time it took to train the network
-    print(f"Training {name} took {(time.time() - start_time)/60:.1f} minutes."
-          f"{epochs} epochs trained with {learning_rate} learning rate.")
-    # Return the trained networks
-    return my_model
+    else:
+        history = network.fit(x_data, y_data, alpha=alpha, epochs=number_of_epochs)
+
+    return network, history
 
 
-def parallel_training(data_tuples: List[Tuple], cores) -> List[model.InputLayer]:
+def train_parallel_networks(
+        data_bags: List[Tuple[np.ndarray[np.float64]]],
+        cores: int
+    ) -> List[Tuple[model.InputLayer, Dict]]:
+    """Train a number of neural networks in parallel.
+
+    Args:
+        data: The data to train the networks on.
+        cores: The number of cores to use.
+
+    Returns:
+        A list of trained networks.
     """
-    Train multiple neural networks in parallel with Pool.map.
-    :param data_tuples: A list of tuples containing the data, labels, epochs, learning rate,
-                        and name of each network and whether to validate the network.
-    :return result_networks: A list of trained neural networks. That need to be combined into an ensemble.
+
+    with mp.Pool(cores) as pool:  # pylint: disable=no-member
+        networks = pool.map(train_network, data_bags)
+
+    return networks
+
+
+def single_model_predict(
+        prediction_data_package: Tuple[model.InputLayer, np.ndarray[np.float64]]
+    ) -> List[NDArray[np.float64]]:
+    """Predict the output of for the test data on the given neural network.
+
+    Args:
+        prediction_data_package: A tuple containing the network and the data to predict.
+
+    Returns:
+        The predictions of the network on the given data. list(np.array(float))
     """
-    # Create a pool of processes
-    with mp.Pool(processes=cores) as pool:
-        # Use the pool to train the networks in parallel
-        result_networks = pool.map(train_network, data_tuples)
 
-    # Return the trained networks
-    return result_networks
+    # Unpack the data package
+    network, x_data = prediction_data_package
+
+    # Predict the output
+    yhats = network.predict(x_data)
+    return yhats
 
 
-def combine_networks(networks: list[model.Layer], learning_rate: float) -> model.Layer:
+def create_parallel_predictions(
+        data_packages: Tuple[model.InputLayer, np.ndarray[np.float64]],
+        cores: int
+    ) -> List[List[NDArray[np.float64]]]:
+    """Create predictions in parallel.
+
+    Args:
+        data_packages: A list of data packages containing the data to predict and
+        the network to predict with.
+
+    Returns:
+        A list of predictions.
     """
-    Combine a list of neural networks into an ensemble.
+
+    with mp.Pool(cores) as pool:
+        predictions = pool.map(single_model_predict, data_packages)
+
+    return predictions
+
+
+def bootstrap_aggregate(
+        all_network_outputs: List[List[NDArray[np.float64]]]
+    ) -> List[NDArray[np.float64]]:
+    """Calculate final predictions by aggregating the predictions of
+    the individual networks through majority vote.
+
+    Args:
+        all_network_outputs: numpy arrays of class propabilities for each instance as
+        predicted by each network.
+
+    Returns:
+        A list of final  predictions after aggregating by majority vote.
     """
-    # Create a new network with the same structure as the networks in the list
-    final_network = model.InputLayer(144, name="final_network") + \
-                    model.DenseLayer(72) + model.ActivationLayer(72, activation=model.hard_tanh) + \
-                    model.DenseLayer(36) + model.ActivationLayer(36, activation=model.swish) + \
-                    model.DenseLayer(18) + model.ActivationLayer(18, activation=model.swish) + \
-                    model.DenseLayer(10) + model.SoftmaxLayer(10) + \
-                    model.LossLayer(loss=model.categorical_crossentropy)
 
-    # Average the weights of the networks in the list
-    for i, layer in enumerate(final_network):
-        if isinstance(layer, model.DenseLayer):
-            final_network[i].weights = np.mean([network[i].weights for network in networks], axis=0)
+    # Initialise vote tally and list of final predictions
+    tally_per_instance = [np.zeros(10) for _ in range(len(all_network_outputs[0]))]
+    final_predictions = np.copy(tally_per_instance)
+
+    # Count the network votes for each instance
+    for i, network in enumerate(all_network_outputs):
+        for j, instance in enumerate(network):
+            # Add a vote for the class with the highest probability
+            tally_per_instance[j][np.argmax(instance)] += 1
+
+    # Resolve the votes by setting class with the most votes to 1
+    for i, instance in enumerate(tally_per_instance):
+        final_predictions[i][np.argmax(instance)] = 1
+
+    return final_predictions
 
 
-    print(final_network[1].weights)
+def evaluate(
+        ys_data: NDArray[np.float64],
+        yhats: List[NDArray[np.float64]],
+        output: Path = None
+    ) -> None:
+    """Evaluate the final predictions by comparing them to the real class labels and
+    creating a confusion matrix with the data module, showing the accuracy of the
+    predictions. The figure is shown when output is None, and saved to the specified
+    location when output is a path.
 
-    # Average the biases of the networks in the list
-    for i, layer in enumerate(final_network):
-        if isinstance(layer, model.DenseLayer):
-            final_network[i].bias = np.mean([network[i].bias for network in networks], axis=0)
+    Args:
+        ys_data: The actual class labels for the test set.
+        yhats: The final predictions made by the bootstrap aggragated
+        ensemble, a list of numpy arrays of class propabilities for each instance.
+        number_of_inputs: The number of input values per instance, used in
+        confusion matrix function.
+        output: The path to the output file.
+    """
 
-    # Return the new network
-    return final_network
+    # Create a confusion matrix
+    plt, accuracy = data.confusion(ys_data, yhats)
+
+    # Save or show the confusion matrix
+    if output:
+        plt.savefig(output)
+    else:
+        plt.show()
+
+    print(f"Accuracy = {accuracy*100.0:.1f}%")
+
+
+def split_train_test(xs_data, ys_data, train_ratio):
+    """Split the data into training and test sets.
+
+    Args:
+        xs_data: The input data.
+        ys_data: The target data.
+        train_ratio: The ratio of the data to use for training.
+
+    Returns:
+        A tuple containing the training and test data.
+    """
+
+    # Shuffle the data
+    indices = np.arange(ys_data.shape[0])
+    np.random.shuffle(indices)
+
+    # Split the data
+    split_index = int(ys_data.shape[0] * train_ratio)
+    train_xs = xs_data[indices[:split_index]]
+    train_ys = ys_data[indices[:split_index]]
+    test_xs = xs_data[indices[split_index:]]
+    test_ys = ys_data[indices[split_index:]]
+
+    return train_xs, train_ys, test_xs, test_ys
 
 
 def main():
+    """Main function of the script, combining all the other functions to train
+    an ensemble of neural networks in parallel on the MNIST dataset. Trained networks
+    are then used to predict a test sets in parallel, after which the predictions are
+    aggragated through majority voting. The final predictions resulting from this
+    are evaluated with a confusion matrix, showing the accuracy of the ensemble.
+
+    Returns:
+        0 if the script runs successfully.
     """
-    This is the main function that executes all funciont calls in the correct order
-    to eventually train an ensemble of neural networks to classify MNIST digits.
-    :return: 0 (if the program ran successfully)
-    """
-    # Parse command line arguments (core count, epochs per network, learning rate, number of instances)
     args = parse_args()
-    number_of_instances = args.number_of_instances
-    cores = args.cores
-    epochs = args.epochs_per_model
-    learning_rate = args.learning_rate
 
+    print(f"Running with arguments:\n\t{args}\nLoading data...")
     # Load the MNIST dataset
-    xs_data, ys_data = dt.mnist_mini("./data/MNIST_mini.dat", num=args.number_of_instances)
+    xs_data, ys_data = data.mnist_mini(args.file, num=args.data_size)
 
-    #Separate the data into training, validation, and test sets
+    print("Data loaded, converting to numpy arrays...")
+    # Turn the data into numpy arrays
+    xs_data = np.array(xs_data)
+    ys_data = np.array(ys_data)
 
-    if args.validate:
-        training_size = int(0.9 * args.number_of_instances)
-        validation_size = int(0.05 * args.number_of_instances)
+    print(f"Data converted, splitting off {args.training_ratio * 100}% for training...")
+    # Get bags
+    train_xs, train_ys, test_xs, test_ys = split_train_test(
+        xs_data,
+        ys_data,
+        args.training_ratio
+    )
 
-        trn_xs, trn_ys = xs_data[:training_size], ys_data[:training_size]
-        val_xs, val_ys = (xs_data[training_size:training_size + validation_size],
-                         ys_data[training_size:training_size + validation_size])
-        test_xs, test_ys = (xs_data[training_size + validation_size:], ys_data[training_size + validation_size:])
-        validation_data = (val_xs, val_ys)
-    else:
-        test_size = int(0.05 * args.number_of_instances)
-        test_xs, test_ys = xs_data[:test_size], ys_data[:test_size]
-        trn_xs, trn_ys = xs_data[test_size:], ys_data[test_size:]
-        validation_data = None
+    print(f"Data split, creating {args.network_count} data packages for training...")
+    # Create data packages for parallel training
+    training_data_packages = create_training_data_packages(
+        x_data=train_xs,
+        y_data=train_ys,
+        bag_count=args.network_count,
+        bag_size=args.bag_size,
+        epochs=args.epochs
+    )
 
-    # Split the data into batches for parallel training
-    data_batches = np.array_split(
-        trn_xs, args.cores
-    )  # list[np.ndarray[np.ndarray[float]]
+    print(
+        f"Data packages created, training {args.network_count} networks in parallel..."
+    )
 
-    label_batches = np.array_split(
-        trn_ys, args.cores
-    )  # list[np.ndarray[np.ndarray[float]]
+    start_time = time.perf_counter()
 
-    data_tuples = [
-        (
-            data_batches[i],
-            label_batches[i],
-            epochs,
-            learning_rate,
-            f"model_{i}",
-            validation_data,
-        )
-        for i in range(args.cores)
-    ]
+    # Train the networks
+    networks, _ = zip(
+        *train_parallel_networks(training_data_packages, args.cores)
+    )
 
-    # Train a neural network on each batch in parallel
-    random.seed(0)
-    networks = parallel_training(data_tuples, args.cores)
+    print(
+        f"Networks trained in {(time.perf_counter() - start_time) / 60.0:.1f} minutes, "
+        f"creating {args.network_count} data packages for predictions..."
+    )
+    # Create data packages for parallel predictions
+    prediction_data_packages = [(network, test_xs) for network in networks]
 
+    print(
+        f"Data packages created, predicting test set in parallel with all"
+        f" {args.network_count} networks..."
+    )
+    # Create predictions
+    predictions = create_parallel_predictions(prediction_data_packages, args.cores)
 
-    # Combine the networks into an ensemble by averaging the weights
-    ensemble = combine_networks(networks, learning_rate)
+    print(
+        f"Predicting finished, received {len(predictions)} sets of predictions, "
+        f"aggregating predictions through majority vote..."
+    )
+    # Aggregate the predictions
+    final_predictions = bootstrap_aggregate(predictions)
 
-    # Evaluate the ensemble on the test set
-    print(f'Loss: {ensemble.evaluate(test_xs, test_ys)}')
-
-    # Show the confusion matrix
-    dt.confusion(test_xs, test_ys, model=ensemble)
+    print("Predictions aggregated, evaluating ensemble performance...")
+    evaluate(
+        ys_data=test_ys,
+        yhats=final_predictions,
+        output=args.output
+    )
 
     return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
