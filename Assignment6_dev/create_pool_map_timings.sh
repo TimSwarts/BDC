@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Create the output directory if it doesn't exist
-mkdir -p ../output
+mkdir -p ./output
 
 # Create the CSV file and write the header
 echo "Cores,Time (seconds)" > ../output/timings.csv
