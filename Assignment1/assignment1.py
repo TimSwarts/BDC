@@ -131,6 +131,8 @@ def quality_line_generator(
         while fastq_file.tell() < stop:
             # readline
             line = fastq_file.readline()
+            if not line:
+                break  # break if EOF
             # check if identifier line
             if line.startswith(b"@"):
                 # if so, read until quality line and yield
