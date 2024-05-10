@@ -46,7 +46,7 @@ def init_args() -> argparse.Namespace:
         dest="file",
         metavar='',
         type=Path,
-        default=Path("./data/MNIST_mini.dat"),
+        default=Path("/students/2023-2024/Thema12/BDC_tswarts_372975/MNIST_mini.dat"),
         required=False,
         help=
             "Path to the directory containing the MNIST dataset.\
