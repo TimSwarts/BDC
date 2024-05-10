@@ -5,6 +5,7 @@ from copy import deepcopy
 import time
 import numpy as np
 import data
+import sys
 
 
 # Activation functions
@@ -345,6 +346,7 @@ class InputLayer(Layer):
                 f"\033[1;36;49m \t Network {self.name: >2} has been trained "
                 f"for {i + 1: >2} epoch(s), loss: {loss_of_epoch:.2f} \033[0m"
             )
+            sys.stdout.flush()
         # Return the loss history
         return history
 
