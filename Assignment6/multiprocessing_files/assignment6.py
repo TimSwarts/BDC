@@ -26,6 +26,10 @@ from typing import List, Tuple, Dict, Any
 from pathlib import Path
 from numpy.typing import NDArray
 import numpy as np
+
+MODEL_PATH = str(Path(__file__).parent.parent.joinpath("resources"))
+sys.path.append(MODEL_PATH)
+
 import data
 import model
 

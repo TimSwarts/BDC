@@ -26,9 +26,12 @@ from pathlib import Path
 from mpi4py import MPI
 from numpy.typing import NDArray
 import numpy as np
-import data
-import model
 
+MODEL_PATH = str(Path(__file__).parent.parent.joinpath("resources"))
+sys.path.append(MODEL_PATH)
+
+import model
+import data
 
 COMM = MPI.COMM_WORLD
 RANK = COMM.Get_rank()
@@ -390,8 +393,8 @@ def main():
     Returns:
         0 if the script runs successfully.
     """
+    
     args = parse_args()
-
 
     if RANK == 0:  # Controller/Root/Worker 0
         # Print some information about the run
