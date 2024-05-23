@@ -15,7 +15,7 @@ Changes:
 * Backpropagation has been optimized:
 The derivative of functions are now calculated outside of the
 list comprehensions and loops that use them, to prevent the same calculations from being done multiple times.
-
+* Refactored the code to use numpy with vectorized activation and derivative functions to greatly speed up training. This also shortened the code a lot.
 ## Changes made to the data script:
 ``data.py`` is a module delivered by Dave Langers as part of the Advanced Datamining course. It contains functions to load and visualize data. The changes made to this script are listed below.
 

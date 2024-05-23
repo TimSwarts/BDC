@@ -38,7 +38,7 @@ def tanh(a):
     :param a: preactivation value (float)
     :return: post activation value (float)
     """
-    return m_tanh(a)
+    return np.tanh(a)
 
 
 def hard_tanh(a):
@@ -69,10 +69,9 @@ def sigmoid(a):
     :param a: preactivation value (float)
     :return: post activation value (float)
     """
-    try:
-        return exp(a) / (1 + exp(a))
-    except OverflowError:
-        return 1.0
+    if a < 0:
+        return np.exp(a) / (1 + np.exp(a))
+    return 1 / (1 + np.exp(-a))
 
 
 def softplus(a):
@@ -82,7 +81,7 @@ def softplus(a):
     :return: post activation value (float)
     """
     try:
-        return log(1 + e**a)
+        return np.log(1 + np.exp(a))
     except OverflowError:
         return a
 
@@ -93,7 +92,7 @@ def relu(a):
     :param a: preactivation value (float)
     :return: post activation value (float)
     """
-    return max(0, a)
+    return np.maximum(0, a)
 
 
 def swish(a, *, beta=1):
@@ -330,6 +329,10 @@ class InputLayer(Layer):
         history = {'loss': []}
         if validation_data is not None:
             history['val_loss'] = []
+        
+        if not isinstance(xs, np.ndarray) or not isinstance(ys, np.ndarray):
+            xs = np.array(xs)
+            ys = np.array(ys)
 
         # Train data and append history dictionary
         for i in range(epochs):
@@ -354,10 +357,10 @@ class InputLayer(Layer):
 class DenseLayer(Layer):
     def __init__(self, outputs, *, name=None, next=None):
         super().__init__(outputs, name=name, next=next)
-        # Set biases, one bias for every neuron (equal to the amount of outputs)
-        self.bias = [0 for _ in range(self.outputs)]
+        # Set biases, one bias for every neuron (equal to the number of outputs)
+        self.bias = np.zeros(self.outputs)
 
-        # Initialise weights (filled later in set_inputs method)
+        # initialise weights (filled later in set_inputs method)
         self.weights = None
 
     def __repr__(self):
@@ -375,105 +378,67 @@ class DenseLayer(Layer):
 
         # Generate uniform random weights for all neurons
         limit = sqrt(6 / (self.inputs + self.outputs))
-        if not self.weights:
-            self.weights = [
-                [random.uniform(-limit, limit) for _ in range(self.inputs)]
-                for _ in range(self.outputs)
-            ]
+        if self.weights is None:
+            self.weights = np.random.uniform(
+                -limit, limit, (self.outputs, self.inputs)
+            )
 
-    def __call__(self, xs: list[list[float]], ys=None, alpha=None):
+    def __call__(self, xs: np.ndarray, ys=None, alpha=None):
         """
-        xs should be a list of lists of values, where each sublist has a number of
-        values equal to self.inputs
+        xs should be a 2D numpy array where each row is an input instance with 
+        a number of values equal to self.inputs.
         """
-        aa = (
-            []
-        )  # Uitvoerwaarden voor alle instances xs (xs is een (nested) lijst met instances)
-        gxs = None  # Set gradient from loss to x-input equal to None
-        for x in xs:
-            a = []  # Uitvoerwaarde voor één instance x (x is een lijst met attributen)
-            for o in range(self.outputs):
-                # Bereken voor elk neuron o uit de lijst invoerwaarden x de uitvoerwaarde
-                pre_activation = self.bias[o] + sum(
-                    self.weights[o][i] * x[i] for i in range(self.inputs)
-                )
-                a.append(
-                    pre_activation
-                )  # a is lijst met de output waarden van alle neuronen voor 1 instance
-            aa.append(
-                a
-            )  # aa is een nested lijst met de output waarden van alle instance
+        # Start empty gradient vector
+        gxs = None
 
-        # Send to aa next layer, and collect its yhats, ls, and gas
-        yhats, ls, gas = self.next(aa, ys, alpha)
+        # Calculate pre-activation values for all instances
+        pre_activations = np.dot(xs, self.weights.T) + self.bias
+
+        # Send to next layer, and collect its yhats, ls, and gas
+        yhats, ls, gas = self.next(pre_activations, ys, alpha)
 
         if alpha:
-            # Initiate empty list
-            gxs = []
-
             # Calculate gradient vectors for all instances
+            gxs = np.dot(gas, self.weights)
+
+            # Scale alpha with the number of instances to prevent the update from being too large
+            scaled_alpha = alpha / xs.shape[0]
+
+            # Update bias and weights per instance
             for x, gan in zip(xs, gas):
-                gxn = [
-                    sum(self.weights[o][i] * gan[o] for o in range(self.outputs))
-                    for i in range(self.inputs)
-                ]
+                update_size = scaled_alpha * gan
+                self.bias -= update_size
+                self.weights -= np.outer(update_size, x)
 
-                # Add instance to list
-                gxs.append(gxn)
-
-                # Update bias and weights per instance
-                for o in range(self.outputs):
-
-                    # b <- b - alpha/N * xi * d_ln/d_ano (xi for bias = 1, therefore not included)
-                    self.bias[o] = self.bias[o] - alpha / len(xs) * gan[o]
-
-                    # w <- w - alpha/N * xi * d_ln/d_ano
-                    self.weights[o] = [
-                        self.weights[o][i] - alpha / len(xs) * gan[o] * x[i]
-                        for i in range(self.inputs)
-                    ]
         return yhats, ls, gxs
 
 
 class ActivationLayer(Layer):
     def __init__(self, outputs, *, name=None, next=None, activation=linear):
         super().__init__(outputs, name=name, next=next)
-        self.activation = activation
+        # Ensure that the activation function and its derivative are vectorized
+        self.activation = np.vectorize(activation)
+        self.activation_derivative = np.vectorize(derivative(activation))
 
     def __repr__(self):
-        text = f'ActivationLayer(outputs={self.outputs}, name={self.name}, activation={self.activation.__name__})'
+        text = f'ActivationLayer(outputs={self.outputs},name={self.name}, activation={self.activation.__name__})'
         if self.next is not None:
             text += ' + ' + repr(self.next)
         return text
 
-    def __call__(self, aa: list[list[float]], ys=None, alpha=None):
-        hh = []   # Post activation values calculated from all pre activation values from the previous layer
-        gas = None # Set gradient from loss to pre activation value to None
-        for a in aa:
-            h = []   # Post activation values of one instance
-            for o in range(self.outputs):
-                # Calculate post activation value for each neuron o, using the pre activation value (a)
-                post_activation = self.activation(a[o])
-                # Append post activation values of all neurons to data instance
-                h.append(post_activation)
-            # Collect all instances in the data set
-            hh.append(h)
+    def __call__(self, aa: np.ndarray, ys=None, alpha=None):
+        # Start empty gradient vector
+        gas = None
+
+        # Calculate the activation value for all instances
+        hh = self.activation(aa)
 
         # Send hh to the next layer and collect its yhats, ls, and gls
         yhats, ls, gls = self.next(hh, ys, alpha)
 
         if alpha:
             # Calculate gradients from the loss to the pre_activation value
-            gas = []
-
-            # Calculate activation derivative function
-            activation_derivative = derivative(self.activation)
-            # Calculate gradient vectors for all instances:, using the derivative of the activation function and gls
-            for a, gln in zip(aa, gls):
-                # For each instance, calculate the gradient from the loss to each pre activation value
-                gan = [activation_derivative(a[i]) * gln[i] for i in range(self.inputs)]
-                gas.append(gan)
-
+            gas = self.activation_derivative(hh) * gls
 
         return yhats, ls, gas
 
@@ -521,6 +486,8 @@ class LossLayer(Layer):
                     # Each instance can have multiple outputs, with the derivative of the loss we calculate dl/dyhat
                     gln = [loss_derivative(yhat[o], y[o]) for o in range(self.inputs)]
                     gls.append(gln)
+                gls = np.array(gls)
+            ls = np.array(ls)
         return yhats, ls, gls
 
 
@@ -550,12 +517,19 @@ class SoftmaxLayer(Layer):
             # Calculate gradients from the loss to last layer neuron output values of all instances
             ghs = []
             for yhat, gln in zip(yhats, gls):
-                # Calculate the gradient vectors for every instance, a vector contains the gradient from the loss to h
-                ghn = [sum(gln[o] * yhat[o] * ((i==o) - yhat[i]) for o in range(self.outputs))
-                       for i in range(self.inputs)]   # This uses the derivative of the softmax function: yno*(𝛿io-yni)
+                # Calculate the gradient vectors for every instance,
+                # a vector contains the gradient from the loss to h
+                ghn = [
+                    sum(
+                        gln[o] * yhat[o] * ((i==o) - yhat[i])
+                        for o in range(self.outputs)
+                    )
+                    for i in range(self.inputs)
+                ]  # This uses the derivative of the softmax function: yno*(𝛿io-yni)
                 ghs.append(ghn)
-
-
+            
+            ghs = np.array(ghs)
+        
         return yhats, ls, ghs
 
 
@@ -563,7 +537,20 @@ def main():
     """
     main function used for testing
     """
-
+    # trn_xs, trn_ys = data.segments(3, num=200, noise=0.5)
+    # val_xs, val_ys = data.segments(3, num=200, noise=0.5)
+    # trn_xs = np.array(trn_xs)
+    # trn_ys = np.array(trn_ys)
+    # val_xs = np.array(val_xs)
+    # val_ys = np.array(val_ys)
+    
+    # my_network = InputLayer(2) + \
+    #              DenseLayer(20) + ActivationLayer(20, activation=tanh) + \
+    #              DenseLayer(10) + ActivationLayer(10, activation=tanh) + \
+    #              DenseLayer(3) + SoftmaxLayer(3) + \
+    #              LossLayer(loss=categorical_crossentropy)
+    # my_history = my_network.fit(trn_xs, trn_ys, alpha=0.2, epochs=100, validation_data=(val_xs, val_ys))
+    # data.curve(my_history, title='My network', save=True)
     return 0
 
 
