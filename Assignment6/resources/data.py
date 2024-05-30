@@ -259,6 +259,36 @@ def graph(funcs, *args, xlim=(-3.0, 3.0)):
     plt.show()
 
 
+def segments(classes, *, num=200, noise=0.0, seed=None):
+    """Generate a dataset consisting of circular segments (i.e. "pizza slices").
+
+    Arguments:
+    classes  -- number of classes to generate
+
+    Keyword options:
+    num      -- number of instances (default 200)
+    noise    -- the amount of noise to add (default 0.0)
+    seed     -- a seed to initialise the random number generator (default random)
+
+    Return values:
+    xs       -- values of the attributes x1 and x2
+    ys       -- class labels in one-hot encoding
+    """
+    # Seed the random number generator
+    random.seed(seed)
+    # Generate attribute data
+    rs = [sqrt(3.0*random.random()) for n in range(num)]
+    fs = [random.random() for n in range(num)]
+    xs = [[r*cos(2.0*pi*f), r*sin(2.0*pi*f)] for r, f in zip(rs, fs)]
+    ys = [[1.0 if floor(f * classes) == c else 0.0 for c in range(classes)] for f in fs]
+    # Add noise to the attributes
+    for n in range(num):
+        for d in range(2):
+            xs[n][d] += random.gauss(0.0, noise)
+    # Return values
+    return xs, ys
+
+
 def curve(series, title=None, save=False, filename=None):
     """Plots the curve of a given data series.
 
@@ -327,6 +357,7 @@ def digits(xs, ys, model=None):
             t += '→{:d}'.format(argmax(model.predict([xs[n]])[0]))
         ax.set_title(t)
     plt.show()
+
 
 def confusion(ys, yhats):
     """Shows 10x10 confusion matrix.
