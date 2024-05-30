@@ -95,8 +95,13 @@ def phred_sum_parser(
         amount_of_lines += 1
         if len(line) > max_line_length:
             max_line_length = len(line)
+
     # Create an array to store all the PHRED scores
-    all_phred_scores = np.zeros((amount_of_lines, max_line_length))
+    all_phred_scores = np.full(
+        (amount_of_lines, max_line_length),
+        np.nan,
+        dtype=np.float16
+    )
 
     # Loop over the quality lines
     for i, line in enumerate(parsing_iterator):
@@ -107,7 +112,7 @@ def phred_sum_parser(
 
     # Calculate sum of all columns and amount of non-zero entries
     chunk_phred_sum = np.sum(all_phred_scores, axis=0)
-    chunk_phred_count = np.count_nonzero(all_phred_scores, axis=0)
+    chunk_phred_count = np.count_nonzero(~np.isnan(all_phred_scores), axis=0)
 
     # Return the file path, sum and count
     return filepath, chunk_phred_sum, chunk_phred_count
