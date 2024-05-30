@@ -168,7 +168,7 @@ def parse_args() -> Tuple:
     return args
 
 
-def create_training_data_packages(
+def create_data_packages(
         x_data: np.ndarray[np.float64],
         y_data: np.ndarray[np.float64],
         bag_count: int,
@@ -197,19 +197,22 @@ def create_training_data_packages(
         # Create a sample of data indices of the given size, allowing duplicates
         indices = np.random.choice(range(indice_count), size=bag_size, replace=True)
 
-        packages.append((x_data[indices], y_data[indices], validate, i + 1, epochs))
+        packages.append(
+            (x_data[indices], y_data[indices], validate, i + 1, epochs, test_xs)
+        )
 
     return packages
 
 
-def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]:
+def train_network(data_package: Tuple) -> Tuple[model.InputLayer, Dict]:
     """Train a neural network on the given data.
 
     Args:
-        data: A data package containing the data to train the network on, and a boolean
-        indicating whether to validate the network. If validate is True, the data is
-        split into training and validation data. Each data packet thus contains three
-        items: x_data, y_data, and validate.
+        data: A data package containing the data to train the network on, a boolean
+        indicating whether to validate the network, the number of epochs to use for
+        training. If validate is True, part of th training data is split off
+        for validation. Each data packet thus contains five items:
+        x_data, y_data, validate, nework_number, number_of_epochs.
 
     Returns:
         A tuple containing the trained network and the training history.
@@ -219,7 +222,13 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
     # Advanced Datamining course, but with the alpha value increased for faster training
     alpha = 0.3
 
-    x_data, y_data, validate, nework_number, number_of_epochs = training_data_package
+    (
+        x_data,
+        y_data,
+        validate,
+        nework_number,
+        number_of_epochs
+    ) = data_package
 
     # Create a neural network, this architecture is based on the one used in my final
     # assignment of the Advanced Datamining course
@@ -272,43 +281,36 @@ def train_parallel_networks(
     return networks
 
 
-def single_model_predict(
-        prediction_data_package: Tuple[model.InputLayer, np.ndarray[np.float64]]
-    ) -> List[NDArray[np.float64]]:
-    """Predict the output of for the test data on the given neural network.
+def train_and_predict(data_package: Tuple):
+    """Train a network on the given data and predict the output for the test data.
 
     Args:
-        prediction_data_package: A tuple containing the network and the data to predict.
-
+        data_package: A data package containing the training and test data.
+    
     Returns:
-        The predictions of the network on the given data. list(np.array(float))
+        The predictions of the network on the test data.
     """
-
-    # Unpack the data package
-    network, x_data = prediction_data_package
-
-    # Predict the output
-    yhats = network.predict(x_data)
-    return yhats
+    training_package = data_package[:-1]
+    current_network = train_network(training_package)
+    prediction_package = (current_network[0], data_package[-1])
+    return single_model_predict(prediction_package)
 
 
-def create_parallel_predictions(
-        data_packages: Tuple[model.InputLayer, np.ndarray[np.float64]],
-        cores: int
-    ) -> List[List[NDArray[np.float64]]]:
-    """Create predictions in parallel.
+def train_and_predict_parallel(
+        data_packages: List[Tuple]
+    ) -> List[NDArray[np.float64]]:
+    """Train and predict in parallel.
 
     Args:
-        data_packages: A list of data packages containing the data to predict and
-        the network to predict with.
+        data_packages: A list of data packages containing the training and test data.
 
     Returns:
         A list of predictions.
     """
 
-    with mp.Pool(cores) as pool:
-        predictions = pool.map(single_model_predict, data_packages)
-
+    with mp.Pool() as pool:
+        predictions = pool.map(train_and_predict, data_packages)
+    
     return predictions
 
 
@@ -326,21 +328,21 @@ def bootstrap_aggregate(
         A list of final  predictions after aggregating by majority vote.
     """
 
-    # Initialise vote tally and list of final predictions
-    tally_per_instance = [np.zeros(10) for _ in range(len(all_network_outputs[0]))]
-    final_predictions = np.copy(tally_per_instance)
+    # # Initialise vote tally and list of final predictions
+    # tally_per_instance = [np.zeros(10) for _ in range(len(all_network_outputs[0]))]
+    # final_predictions = np.copy(tally_per_instance)
 
-    # Count the network votes for each instance
-    for i, network in enumerate(all_network_outputs):
-        for j, instance in enumerate(network):
-            # Add a vote for the class with the highest probability
-            tally_per_instance[j][np.argmax(instance)] += 1
+    # # Count the network votes for each instance
+    # for i, network_predictions in enumerate(all_network_outputs):
+    #     for j, instance in enumerate(network_predictions):
+    #         # Add a vote for the class with the highest probability
+    #         tally_per_instance[j][np.argmax(instance)] += 1
 
-    # Resolve the votes by setting class with the most votes to 1
-    for i, instance in enumerate(tally_per_instance):
-        final_predictions[i][np.argmax(instance)] = 1
+    # # Resolve the votes by setting class with the most votes to 1
+    # for i, instance in enumerate(tally_per_instance):
+    #     final_predictions[i][np.argmax(instance)] = 1
 
-    return final_predictions
+    return np.average(all_network_outputs, axis=0)
 
 
 def evaluate(
@@ -422,7 +424,8 @@ def main():
     ys_data = np.array(ys_data)
 
     print(f"Data converted, splitting off {args.training_ratio * 100}% for training...")
-    # Get bags
+    # Get the training and test sets
+    global test_xs
     train_xs, train_ys, test_xs, test_ys = split_train_test(
         xs_data,
         ys_data,
@@ -430,8 +433,8 @@ def main():
     )
 
     print(f"Data split, creating {args.network_count} data packages for training...")
-    # Create data packages for parallel training
-    training_data_packages = create_training_data_packages(
+    # Create data packages for parallel training and predicting
+    data_packages = create_data_packages(
         x_data=train_xs,
         y_data=train_ys,
         bag_count=args.network_count,
@@ -442,31 +445,15 @@ def main():
     print(
         f"Data packages created, training {args.network_count} networks in parallel..."
     )
-
     start_time = time.perf_counter()
-
-    # Train the networks
-    networks, _ = zip(
-        *train_parallel_networks(training_data_packages, args.cores)
-    )
+    
+    # Train the networks and get predictions
+    predictions = train_and_predict_parallel(data_packages)
 
     print(
-        f"Networks trained in {(time.perf_counter() - start_time) / 60.0:.1f} minutes, "
-        f"creating {args.network_count} data packages for predictions..."
-    )
-    # Create data packages for parallel predictions
-    prediction_data_packages = [(network, test_xs) for network in networks]
-
-    print(
-        f"Data packages created, predicting test set in parallel with all"
-        f" {args.network_count} networks..."
-    )
-    # Create predictions
-    predictions = create_parallel_predictions(prediction_data_packages, args.cores)
-
-    print(
-        f"Predicting finished, received {len(predictions)} sets of predictions, "
-        f"aggregating predictions through majority vote..."
+        f"Networks finished training and sending their test data predictions in "
+        f"{(time.perf_counter() - start_time) / 60.0:.1f} minutes "
+        f"now aggregating predictions through majority voting..."
     )
     # Aggregate the predictions
     final_predictions = bootstrap_aggregate(predictions)
@@ -477,7 +464,7 @@ def main():
         yhats=final_predictions,
         output=args.output
     )
-
+    
     return 0
 
 
