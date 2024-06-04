@@ -20,13 +20,13 @@ source /commons/conda/conda_load.sh;
 
 # Loop through the number of tasks
 for ranks in {1..10}; do
-    if [ $cores -eq 1 ]; then
-        echo "$cores,NULL" >> ./output/pool_timings.csv
+    if [ $ranks -eq 1 ]; then
+        echo "$ranks,NULL" >> ./output/mpi_timings.csv
         continue
     fi
     # Run the Python script with mpiexec, using -np to specify the number of ranks
     start_time=$(date +%s.%N)
-    mpiexec -np $ranks python3 ./mpi_files/assignment6_mpi.py -n 10 -s 1000 -b 750 -e 25
+    mpiexec -np $ranks python3 ./mpi_files/assignment6_mpi.py -n 10 -s 8000 -b 3000 -e 25
     end_time=$(date +%s.%N)
 
     # Calculate the elapsed time in seconds
