@@ -314,6 +314,26 @@ def train_and_predict_parallel(
     return predictions
 
 
+def single_model_predict(
+        prediction_data_package: Tuple[model.InputLayer, np.ndarray[np.float64]]
+    ) -> List[NDArray[np.float64]]:
+    """Predict the output of for the test data on the given neural network.
+
+    Args:
+        prediction_data_package: A tuple containing the network and the data to predict.
+
+    Returns:
+        The predictions of the network on the given data. list(np.array(float))
+    """
+
+    # Unpack the data package
+    network, x_data = prediction_data_package
+
+    # Predict the output
+    yhats = network.predict(x_data)
+    return yhats
+
+
 def bootstrap_aggregate(
         all_network_outputs: List[List[NDArray[np.float64]]]
     ) -> List[NDArray[np.float64]]:
@@ -441,6 +461,8 @@ def main():
         bag_size=args.bag_size,
         epochs=args.epochs
     )
+
+
 
     print(
         f"Data packages created, training {args.network_count} networks in parallel..."
