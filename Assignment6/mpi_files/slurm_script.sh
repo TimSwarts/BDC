@@ -24,7 +24,7 @@ mkdir -p ./output/slurm
 export OUTPUT_FILE="./output/slurm/${SLURM_NTASKS}tasks_n10s8000b3000e25a03.png"
 
 # Run the Python script with mpiexec, using -np equal to --ntasks in slurm
-time mpiexec -np 10 python3 assignment6_mpi.py \
+time mpiexec -np 10 python3 ./mpi_files/assignment6_mpi.py \
     --file $FILE \
     --network_count 10 \
     --data_size 8000 \

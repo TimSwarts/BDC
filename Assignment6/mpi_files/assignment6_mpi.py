@@ -140,6 +140,7 @@ def init_args() -> argparse.Namespace:
             "Seed for the random number generator used for extracting MNIST data.\
             Default is None"
     )
+
     return parser.parse_args()
 
 
@@ -220,9 +221,46 @@ def create_training_data_packages(
         # Create a sample of data indices of the given size, allowing duplicates
         indices = np.random.choice(range(indice_count), size=bag_size, replace=True)
 
-        packages.append((x_data[indices], y_data[indices], validate, i + 1, epochs))
+        packages.append((x_data[indices], y_data[indices], validate, epochs, i+1))
 
     return packages
+
+
+def create_data_packages(
+        x_data: np.ndarray[np.float64],
+        y_data: np.ndarray[np.float64],
+        bag_count: int,
+        bag_size: int,
+        epochs: int,
+        validate: bool = False
+    ) -> List[Tuple[Any]]:
+    """Creates data packages for parallel network training. It creates the
+    batches (bags) from the input data by sampling with replacement and
+    adds the extra parameters needed for training, such as wehter to validate.
+
+    Args:
+        data: The dataset to sample from,
+        a tuple containing an X (predictors) set and a y (response) variable.
+        sample_count: The number of samples to generate.
+        sample_size: The size of each sample.
+
+    Returns:
+        A tuple of of data bags.
+    """
+
+    indice_count = y_data.shape[0]
+    packages = []
+
+    for i in range(bag_count):
+        # Create a sample of data indices of the given size, allowing duplicates
+        indices = np.random.choice(range(indice_count), size=bag_size, replace=True)
+
+        packages.append(
+            (x_data[indices], y_data[indices], validate, i + 1, epochs, test_xs)
+        )
+
+    return packages
+
 
 
 def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]:
@@ -242,7 +280,7 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
     # Advanced Datamining course, but with alpha value increased for faster training
     alpha = 0.3
 
-    x_data, y_data, validate, nework_number, number_of_epochs = training_data_package
+    x_data, y_data, validate, number_of_epochs, nework_number = training_data_package
 
     # Create a neural network, this architecture is based on the one used in my final
     # assignment of the Advanced Datamining course
@@ -273,6 +311,24 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
         history = network.fit(x_data, y_data, alpha=alpha, epochs=number_of_epochs)
 
     return network, history
+
+
+def train_and_predict(data_package: Tuple):
+    """Train a network on the given data and predict the output for the test data.
+
+    Args:
+        data_package: A data package containing the training and test data.
+    
+    Returns:
+        The predictions of the network on the test data.
+    """
+    training_package = data_package[:-1]
+    # Train the network
+    print(f"Rank {RANK:2} started training network {training_package[-1]:2}")
+    sys.stdout.flush()
+    current_network = train_network(training_package)
+    prediction_package = (current_network[0], data_package[-1])
+    return single_model_predict(prediction_package)
 
 
 def single_model_predict(
@@ -310,21 +366,20 @@ def bootstrap_aggregate(
         A list of final  predictions after aggregating by majority vote.
     """
 
-    # Initialise vote tally and list of final predictions
-    tally_per_instance = [np.zeros(10) for _ in range(len(all_network_outputs[0]))]
-    final_predictions = np.copy(tally_per_instance)
+    # # Initialise vote tally and list of final predictions
+    # tally_per_instance = [np.zeros(10) for _ in range(len(all_network_outputs[0]))]
+    # final_predictions = np.copy(tally_per_instance)
 
-    # Count the network votes for each instance
-    for i, network in enumerate(all_network_outputs):
-        for j, instance in enumerate(network):
-            # Add a vote for the class with the highest probability
-            tally_per_instance[j][np.argmax(instance)] += 1
+    # # Count the network votes for each instance
+    # for i, network in enumerate(all_network_outputs):
+    #     for j, instance in enumerate(network):
+    #         # Add a vote for the class with the highest probability
+    #         tally_per_instance[j][np.argmax(instance)] += 1
 
-    # Resolve the votes by setting class with the most votes to 1
-    for i, instance in enumerate(tally_per_instance):
-        final_predictions[i][np.argmax(instance)] = 1
-
-    return final_predictions
+    # # Resolve the votes by setting class with the most votes to 1
+    # for i, instance in enumerate(tally_per_instance):
+    #     final_predictions[i][np.argmax(instance)] = 1
+    return np.average(all_network_outputs, axis=0)
 
 
 def evaluate(
@@ -398,11 +453,17 @@ def main():
 
     if RANK == 0:  # Controller/Root/Worker 0
         # Print some information about the run
-        print(f"Running on {HOST} with {SIZE} processes.")
-        print(f"Running with arguments:\n{args}")
+        print(
+            f"Running on {HOST} with {SIZE} ranks.\n"
+            f"Rank 0 will be the controller, sending data to {SIZE - 1} workers.\n"
+            f"Running with arguments:\n{args}"
+        )
         sys.stdout.flush()  # Flush buffer to show the print statements in slurm.out
 
-        # Load the MNIST dataset
+        # if args.time:
+        #     start = perf_counter()
+
+        # Load the MNIST numbers dataset
         xs_data, ys_data = data.mnist_mini(args.file, num=args.data_size)
 
         # Turn the data into numpy arrays
@@ -412,19 +473,20 @@ def main():
         print(
             f"Loaded {args.data_size} instances from the MNIST dataset.\n"
             f"Here is the first instance as an example:\n"
-            f"X: {xs_data[:1]}\n"
-            f"Y: {ys_data[:1]}\n"
+            f"X: {xs_data[0]}\n"
+            f"Y: {ys_data[0]}\n"
         )
         sys.stdout.flush()
-        # Get bags
+        # Split data into training and test sets
+        global test_xs
         train_xs, train_ys, test_xs, test_ys = split_train_test(
             xs_data,
             ys_data,
             args.training_ratio
         )
 
-        # Create data packages for parallel training
-        training_data_packages = create_training_data_packages(
+        # Create data packages for parallel training and testing
+        data_packages = create_data_packages(
             x_data=train_xs,
             y_data=train_ys,
             bag_count=args.network_count,
@@ -432,74 +494,54 @@ def main():
             epochs=args.epochs
         )
 
-        # Ensure even distribution of data packages
-        train_packages_per_rank = [
-            training_data_packages[i::SIZE] for i in range(SIZE)
-        ]
+        # Setup result collection variable
+        all_predictions = []
 
-    else: # Normal Workers
-        train_packages_per_rank = None
+        # Distribute the data packages to the workers
+        package_index = 0
 
-    # Scatter the training data packages and fetch current rank's data package
-    rank_training_packages = COMM.scatter(
-        train_packages_per_rank, root=0
-    )  # data is None for normal workers, so they only receive and don't send
-
-    # Train network for current rank
-    print(f"Rank {RANK} has received data, training network on training data...")
-    sys.stdout.flush()
-    rank_networks = []
-    for rank_training_package in rank_training_packages:
-        network, _ = train_network(rank_training_package)
-        rank_networks.append(network)
+        for worker in range(1, SIZE):
+            # Initial distribution of data packages, sending one package to each worker
+            if package_index < args.network_count:
+                COMM.send(data_packages[package_index], dest=worker, tag=1)
+                package_index += 1
     
+        # Collect the results and send new data packages
+        while package_index < args.network_count:
+            # Receive the results from the workers
+            status = MPI.Status()
+            rank_predictions = COMM.recv(source=MPI.ANY_SOURCE, tag=1, status=status)
+            all_predictions.append(rank_predictions)
 
-    # Gather the results
-    print(f"Sending/Gathering results in rank {RANK}...")
-    nested_networks = COMM.gather(network, root=0)
+            # Send new data packages
+            COMM.send(data_packages[package_index], dest=status.source, tag=1)
+            package_index += 1
+        
+        # Collect the remaining results
+        for worker in range(1, SIZE):
+            rank_predictions = COMM.recv(source=MPI.ANY_SOURCE, tag=1)
+            all_predictions.append(rank_predictions)
+            COMM.send(None, dest=worker, tag=0)
 
-    if RANK == 0:
-        # Create data packages for parallel predictions
-        print("Rank 0 is creating prediction data packages...")
-        prediction_data_packages = [
-            (network, test_xs) for network in flatten_list(nested_networks)
-        ]
-
-        # Ensure even distribution of data packages
-        predict_packages_per_rank = [
-            prediction_data_packages[i::SIZE] for i in range(SIZE)
-        ]
-    else:
-        predict_packages_per_rank = None
-    
-    # Scatter the prediction data packages and fetch current rank's data package
-    rank_prediction_package = COMM.scatter(
-        predict_packages_per_rank, root=0
-    )  # data is None for normal workers, so they only receive and don't send
-    
-    # Create predictions for current rank
-    print(f"Rank {RANK} has received data, predicting test set...")
-    rank_predictions = []
-    for rank_prediction_package in rank_prediction_package:
-        rank_predictions.append(single_model_predict(rank_prediction_package))
-    
-    # Gather the results
-    print(f"Sending/Gathering results in rank {RANK}...")
-    all_predictions = COMM.gather(rank_predictions, root=0)
-
-    if RANK == 0:
-        # Aggregate the predictions and evaluate
-        print("Rank 0 is aggregating predictions...")
-        flat_predictions = flatten_list(all_predictions)
-        final_predictions = bootstrap_aggregate(flat_predictions)
+        # Aggregate the network predictions through majority voting
+        final_predictions = bootstrap_aggregate(all_predictions)
 
         # Evaluate the final predictions
-        print("Rank 0 is evaluating predictions...")
         evaluate(
             ys_data=test_ys,
             yhats=final_predictions,
             output=args.output
         )
+    else:
+        # Worker rank
+        while True:
+            data_package = COMM.recv(source=0, tag=MPI.ANY_TAG)
+            if data_package is None:
+                break
+            
+            # Train the network and predict the test data
+            result = train_and_predict(data_package)
+            COMM.send(result, dest=0, tag=1)
 
     return 0
 
