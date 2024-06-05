@@ -20,7 +20,6 @@ __status__ = "Development"
 
 import sys
 import argparse
-import multiprocessing as mp
 from typing import List, Tuple, Dict, Any
 from pathlib import Path
 from mpi4py import MPI
@@ -175,7 +174,7 @@ def flatten_list(nested_list):
 
     Args:
         nested_list: A list of lists with any depth or format of nesting.
-    
+
     Returns:
         A flat list containing all individual elements from the nested
         list as a single array of values (i.e).
@@ -318,7 +317,7 @@ def train_and_predict(data_package: Tuple):
 
     Args:
         data_package: A data package containing the training and test data.
-    
+
     Returns:
         The predictions of the network on the test data.
     """
@@ -366,19 +365,6 @@ def bootstrap_aggregate(
         A list of final  predictions after aggregating by majority vote.
     """
 
-    # # Initialise vote tally and list of final predictions
-    # tally_per_instance = [np.zeros(10) for _ in range(len(all_network_outputs[0]))]
-    # final_predictions = np.copy(tally_per_instance)
-
-    # # Count the network votes for each instance
-    # for i, network in enumerate(all_network_outputs):
-    #     for j, instance in enumerate(network):
-    #         # Add a vote for the class with the highest probability
-    #         tally_per_instance[j][np.argmax(instance)] += 1
-
-    # # Resolve the votes by setting class with the most votes to 1
-    # for i, instance in enumerate(tally_per_instance):
-    #     final_predictions[i][np.argmax(instance)] = 1
     return np.average(all_network_outputs, axis=0)
 
 
@@ -448,7 +434,7 @@ def main():
     Returns:
         0 if the script runs successfully.
     """
-    
+
     args = parse_args()
 
     if RANK == 0:  # Controller/Root/Worker 0
@@ -505,7 +491,7 @@ def main():
             if package_index < args.network_count:
                 COMM.send(data_packages[package_index], dest=worker, tag=1)
                 package_index += 1
-    
+
         # Collect the results and send new data packages
         while package_index < args.network_count:
             # Receive the results from the workers
@@ -516,7 +502,7 @@ def main():
             # Send new data packages
             COMM.send(data_packages[package_index], dest=status.source, tag=1)
             package_index += 1
-        
+
         # Collect the remaining results
         for worker in range(1, SIZE):
             rank_predictions = COMM.recv(source=MPI.ANY_SOURCE, tag=1)
@@ -538,7 +524,7 @@ def main():
             data_package = COMM.recv(source=0, tag=MPI.ANY_TAG)
             if data_package is None:
                 break
-            
+
             # Train the network and predict the test data
             result = train_and_predict(data_package)
             COMM.send(result, dest=0, tag=1)

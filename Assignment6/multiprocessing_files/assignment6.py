@@ -174,11 +174,11 @@ def create_data_packages(
         bag_count: int,
         bag_size: int,
         epochs: int,
-        validate: bool = False
+        test_xs: np.ndarray[np.float64]
     ) -> List[Tuple[Any]]:
     """Creates data packages for parallel network training. It creates the
     batches (bags) from the input data by sampling with replacement and
-    adds the extra parameters needed for training, such as wehter to validate.
+    adds the extra parameters needed for training
 
     Args:
         data: The dataset to sample from,
@@ -198,7 +198,7 @@ def create_data_packages(
         indices = np.random.choice(range(indice_count), size=bag_size, replace=True)
 
         packages.append(
-            (x_data[indices], y_data[indices], validate, i + 1, epochs, test_xs)
+            (x_data[indices], y_data[indices], i + 1, epochs, test_xs)
         )
 
     return packages
@@ -208,27 +208,23 @@ def train_network(data_package: Tuple) -> Tuple[model.InputLayer, Dict]:
     """Train a neural network on the given data.
 
     Args:
-        data: A data package containing the data to train the network on, a boolean
-        indicating whether to validate the network, the number of epochs to use for
-        training. If validate is True, part of th training data is split off
-        for validation. Each data packet thus contains five items:
-        x_data, y_data, validate, nework_number, number_of_epochs.
+        data: A data package containing the data to train the network on,
+        the number of epochs to use for training. Each data packet thus contains
+        four items:
+            x_data,
+            y_data,
+            nework_number,
+            number_of_epochs
 
     Returns:
         A tuple containing the trained network and the training history.
     """
 
     # The hyperparameters used are based on those used in my final assignment of the
-    # Advanced Datamining course, but with the alpha value increased for faster training
+    # Advanced Datamining course, but with alpha value increased for faster training
     alpha = 0.3
 
-    (
-        x_data,
-        y_data,
-        validate,
-        nework_number,
-        number_of_epochs
-    ) = data_package
+    x_data, y_data, nework_number, number_of_epochs = data_package
 
     # Create a neural network, this architecture is based on the one used in my final
     # assignment of the Advanced Datamining course
@@ -246,17 +242,7 @@ def train_network(data_package: Tuple) -> Tuple[model.InputLayer, Dict]:
     )
 
     # Train the network
-    if validate:
-        x_train, y_train, x_val, y_val = split_train_test(x_data, y_data, 0.9)
-        history = network.fit(
-            x_train,
-            y_train,
-            alpha=alpha,
-            epochs=number_of_epochs,
-            validation_data=(x_val, y_val)
-        )
-    else:
-        history = network.fit(x_data, y_data, alpha=alpha, epochs=number_of_epochs)
+    history = network.fit(x_data, y_data, alpha=alpha, epochs=number_of_epochs)
 
     return network, history
 
@@ -286,7 +272,7 @@ def train_and_predict(data_package: Tuple):
 
     Args:
         data_package: A data package containing the training and test data.
-    
+
     Returns:
         The predictions of the network on the test data.
     """
@@ -310,7 +296,7 @@ def train_and_predict_parallel(
 
     with mp.Pool() as pool:
         predictions = pool.map(train_and_predict, data_packages)
-    
+
     return predictions
 
 
@@ -347,20 +333,6 @@ def bootstrap_aggregate(
     Returns:
         A list of final  predictions after aggregating by majority vote.
     """
-
-    # # Initialise vote tally and list of final predictions
-    # tally_per_instance = [np.zeros(10) for _ in range(len(all_network_outputs[0]))]
-    # final_predictions = np.copy(tally_per_instance)
-
-    # # Count the network votes for each instance
-    # for i, network_predictions in enumerate(all_network_outputs):
-    #     for j, instance in enumerate(network_predictions):
-    #         # Add a vote for the class with the highest probability
-    #         tally_per_instance[j][np.argmax(instance)] += 1
-
-    # # Resolve the votes by setting class with the most votes to 1
-    # for i, instance in enumerate(tally_per_instance):
-    #     final_predictions[i][np.argmax(instance)] = 1
 
     return np.average(all_network_outputs, axis=0)
 
@@ -445,7 +417,6 @@ def main():
 
     print(f"Data converted, splitting off {args.training_ratio * 100}% for training...")
     # Get the training and test sets
-    global test_xs
     train_xs, train_ys, test_xs, test_ys = split_train_test(
         xs_data,
         ys_data,
@@ -459,7 +430,8 @@ def main():
         y_data=train_ys,
         bag_count=args.network_count,
         bag_size=args.bag_size,
-        epochs=args.epochs
+        epochs=args.epochs,
+        test_xs=test_xs
     )
 
 
@@ -468,7 +440,7 @@ def main():
         f"Data packages created, training {args.network_count} networks in parallel..."
     )
     start_time = time.perf_counter()
-    
+
     # Train the networks and get predictions
     predictions = train_and_predict_parallel(data_packages)
 
@@ -486,7 +458,7 @@ def main():
         yhats=final_predictions,
         output=args.output
     )
-    
+
     return 0
 
 
