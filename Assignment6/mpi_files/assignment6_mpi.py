@@ -231,11 +231,10 @@ def create_data_packages(
         bag_count: int,
         bag_size: int,
         epochs: int,
-        validate: bool = False
     ) -> List[Tuple[Any]]:
     """Creates data packages for parallel network training. It creates the
     batches (bags) from the input data by sampling with replacement and
-    adds the extra parameters needed for training, such as wehter to validate.
+    adds the extra parameters needed for training.
 
     Args:
         data: The dataset to sample from,
@@ -255,7 +254,7 @@ def create_data_packages(
         indices = np.random.choice(range(indice_count), size=bag_size, replace=True)
 
         packages.append(
-            (x_data[indices], y_data[indices], validate, i + 1, epochs, test_xs)
+            (x_data[indices], y_data[indices], i + 1, epochs, test_xs)
         )
 
     return packages
@@ -266,10 +265,13 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
     """Train a neural network on the given data.
 
     Args:
-        data: A data package containing the data to train the network on, and a boolean
-        indicating whether to validate the network. If validate is True, the data is
-        split into training and validation data. Each data packet thus contains three
-        items: x_data, y_data, and validate.
+        data: A data package (tuple) containing the data to train the network along
+        with metadata such as the number of epochs to train for. A package should
+        contain the following elements (in order):
+        - The input data (x_data)
+        - The target data (y_data)
+        - The number of epochs to train for (number_of_epochs)
+        - The number of the network (nework_number)
 
     Returns:
         A tuple containing the trained network and the training history.
@@ -279,7 +281,7 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
     # Advanced Datamining course, but with alpha value increased for faster training
     alpha = 0.3
 
-    x_data, y_data, validate, number_of_epochs, nework_number = training_data_package
+    x_data, y_data, number_of_epochs, nework_number = training_data_package
 
     # Create a neural network, this architecture is based on the one used in my final
     # assignment of the Advanced Datamining course
@@ -297,17 +299,7 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
     )
 
     # Train the network
-    if validate:
-        x_train, y_train, x_val, y_val = split_train_test(x_data, y_data, 0.9)
-        history = network.fit(
-            x_train,
-            y_train,
-            alpha=alpha,
-            epochs=number_of_epochs,
-            validation_data=(x_val, y_val)
-        )
-    else:
-        history = network.fit(x_data, y_data, alpha=alpha, epochs=number_of_epochs)
+    history = network.fit(x_data, y_data, alpha=alpha, epochs=number_of_epochs)
 
     return network, history
 
