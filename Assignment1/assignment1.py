@@ -100,7 +100,7 @@ def phred_sum_parser(
     all_phred_scores = np.full(
         (amount_of_lines, max_line_length),
         np.nan,
-        dtype=np.float16
+        dtype=np.float32
     )
 
     # Loop over the quality lines
@@ -108,10 +108,10 @@ def phred_sum_parser(
         for j, char in enumerate(line):
             all_phred_scores[i, j] = char
 
-    all_phred_scores[np.nonzero(all_phred_scores)] -= 33
+    all_phred_scores[~np.isnan(all_phred_scores)] -= 33
 
-    # Calculate sum of all columns and amount of non-zero entries
-    chunk_phred_sum = np.sum(all_phred_scores, axis=0)
+    # Calculate sum of all columns and amount of entries per column
+    chunk_phred_sum = np.nansum(all_phred_scores, axis=0)
     chunk_phred_count = np.count_nonzero(~np.isnan(all_phred_scores), axis=0)
 
     # Return the file path, sum and count
