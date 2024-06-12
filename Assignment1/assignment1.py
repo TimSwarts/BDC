@@ -100,7 +100,7 @@ def phred_sum_parser(
     all_phred_scores = np.full(
         (amount_of_lines, max_line_length),
         np.nan,
-        dtype=np.float32
+        dtype=np.float64
     )
 
     # Loop over the quality lines
@@ -193,10 +193,13 @@ def multi_processing(
         post_processing(results, file_paths, output_file_path)
 
 
-def post_processing(results: List[Tuple], file_paths: List[Path], output_file_path: Path = None) -> None:
+def post_processing(
+        results: List[Tuple], file_paths: List[Path], output_file_path: Path = None
+    ) -> None:
     """
     This function post processes the results of the multi-processing.
-    :param results: A list of tuples containing file path, sum of phred scores and count of scores.
+    :param results: A list of tuples containing file path, sum of phred scores
+                    and count of scores.
     :param file_paths: Paths of the FastQ files.
     :param output_file_path: Path of the output file.
     """
