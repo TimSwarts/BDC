@@ -54,7 +54,7 @@ def init_args() -> argparse.Namespace:
         required=False,
         help=
             "Path to the directory containing the MNIST dataset.\
-            Default is ./data/MNIST_mini.dat."
+            Default is /students/2023-2024/Thema12/BDC_tswarts_372975/MNIST_mini.dat"
     )
 
     parser.add_argument(
@@ -113,7 +113,7 @@ def init_args() -> argparse.Namespace:
         required=False,
         help=
             "Ratio of the data to use for training remaining data is used for testing.\
-            Default is 0.8."
+            This value should range from 0.01 to 0.99. Default is 0.8."
     )
 
 
@@ -151,15 +151,21 @@ def parse_args() -> Tuple:
 
     args = init_args()
 
+    # Check if training ratio is within bounds
+    if args.training_ratio > 0.95 or args.training_ratio < 0.01:
+        print("Error: Training ratio must be float between 0.01 and 0.99.")
+        sys.exit(1)
+
     # Check if the data size is within the bounds of the dataset
     if args.data_size > 60000:
-        print("Data size exceeds the number of instances in the dataset.")
+        print("Error: Data size exceeds the number of instances in the dataset.")
         sys.exit(1)
 
     # Check if the batch size is within the bounds of the dataset
     if args.bag_size > args.data_size:
-        print("Batch size exceeds the number of instances in the dataset.")
-        sys.exit(1)
+        print(
+         "Warning: Batch size exceeds the number of instances in the training dataset."
+        )
 
     # Set the batch size to the data size if it is 0
     if args.bag_size == 0:
@@ -433,7 +439,6 @@ def main():
         epochs=args.epochs,
         test_xs=test_xs
     )
-
 
 
     print(

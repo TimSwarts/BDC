@@ -19,6 +19,7 @@ __status__ = "Development"
 
 
 import sys
+from os import path
 import argparse
 from typing import List, Tuple, Dict, Any
 from pathlib import Path
@@ -152,6 +153,11 @@ def parse_args() -> Tuple:
 
     args = init_args()
 
+    # Check if training ratio is within bounds
+    if args.training_ratio > 0.95 or args.training_ratio < 0.01:
+        print("Error: Training ratio must be float between 0.01 and 0.99.")
+        sys.exit(1)
+
     # Check if the data size is within the bounds of the dataset
     if args.data_size > 60000:
         print("Data size exceeds the number of instances in the dataset.")
@@ -159,36 +165,15 @@ def parse_args() -> Tuple:
 
     # Check if the batch size is within the bounds of the dataset
     if args.bag_size > args.data_size:
-        print("Batch size exceeds the number of instances in the dataset.")
-        sys.exit(1)
+        print(
+         "Warning: Batch size exceeds the number of instances in the training dataset."
+        )
 
     # Set the batch size to the data size if it is 0
     if args.bag_size == 0:
         args.bag_size = args.data_size
 
     return args
-
-
-def flatten_list(nested_list):
-    """Flatten a nested list.
-
-    Args:
-        nested_list: A list of lists with any depth or format of nesting.
-
-    Returns:
-        A flat list containing all individual elements from the nested
-        list as a single array of values (i.e).
-    """
-    def flatten(lst):
-        for item in lst:
-            if isinstance(item, list):
-                flatten(item)
-            else:
-                flat_list.append(item)
-
-    flat_list = []
-    flatten(nested_list)
-    return flat_list
 
 
 def create_training_data_packages(
@@ -270,8 +255,8 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
         contain the following elements (in order):
         - The input data (x_data)
         - The target data (y_data)
-        - The number of epochs to train for (number_of_epochs)
         - The number of the network (nework_number)
+        - The number of epochs to train for (number_of_epochs)
 
     Returns:
         A tuple containing the trained network and the training history.
@@ -281,7 +266,7 @@ def train_network(training_data_package: Tuple) -> Tuple[model.InputLayer, Dict]
     # Advanced Datamining course, but with alpha value increased for faster training
     alpha = 0.3
 
-    x_data, y_data, number_of_epochs, nework_number = training_data_package
+    x_data, y_data, nework_number, number_of_epochs = training_data_package
 
     # Create a neural network, this architecture is based on the one used in my final
     # assignment of the Advanced Datamining course
@@ -315,7 +300,7 @@ def train_and_predict(data_package: Tuple):
     """
     training_package = data_package[:-1]
     # Train the network
-    print(f"Rank {RANK:2} started training network {training_package[-1]:2}")
+    print(f"Rank {RANK:2} started training network {training_package[2]:2}")
     sys.stdout.flush()
     current_network = train_network(training_package)
     prediction_package = (current_network[0], data_package[-1])
@@ -426,6 +411,15 @@ def main():
     Returns:
         0 if the script runs successfully.
     """
+
+    if SIZE < 2:
+        print(
+            f"ERROR: Not enough ranks! This script requires at least 2 ranks to run."
+            f"\nPlease run with:"
+            f"\n\t'mpiexec -np <number_of_ranks> python3 {path.basename(__file__)} [OPTIONS]'"
+            f"\nwhere number_of_ranks >= 2."
+        )
+        sys.exit(1)
 
     args = parse_args()
 
