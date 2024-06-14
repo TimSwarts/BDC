@@ -6,17 +6,15 @@
 #SBATCH --partition=assemblix
 #SBATCH --nodelist=assemblix2019
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=15
+#SBATCH --ntasks=15
+#SBATCH --cpus-per-task=1
 
 
-#  Make an output directory for the accuracy results
+#  Make an output directory for the results
 mkdir -p ./output/
 
 # Initialise the CSV file and write the header
 echo "Ranks,Time" > ./output/mpi_timings.csv
-
-# Activate the master conda environment
-# source /commons/conda/conda_load.sh;
 
 # Loop through the number of tasks
 for ranks in {1..15}; do
@@ -33,6 +31,8 @@ for ranks in {1..15}; do
 
     # Calculate the elapsed time in seconds
     elapsed_time=$(echo "$end_time - $start_time" | bc)
+
+    echo "Finished running with $ranks ranks at $(date +"%d-%m-%y %T")"
 
     # Append the result to the CSV file
     echo "$ranks,$elapsed_time" >> ./output/mpi_timings.csv

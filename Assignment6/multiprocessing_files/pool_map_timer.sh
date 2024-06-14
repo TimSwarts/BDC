@@ -6,7 +6,8 @@
 #SBATCH --partition=assemblix
 #SBATCH --nodelist=assemblix2019
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=15
+#SBATCH --ntasks=15
+#SBATCH --cpus-per-task=1
 #SBATCH --begin=now
 
 
@@ -16,10 +17,7 @@ mkdir -p ./output
 # Create the CSV file and write the header
 echo "Cores,Time" > ./output/pool_timings.csv
 
-# Activate the master conda environment
-# source /commons/conda/conda_load.sh;
-
-# Loop through the number of cores from 1 to 10
+# Loop through the number of cores from 1 to 15
 for cores in {1..15}; do
     run_start_time=$(date +"%d-%m-%y %T")
     echo "Started running with $cores ranks at $run_start_time"
