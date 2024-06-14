@@ -289,7 +289,7 @@ def train_and_predict(data_package: Tuple):
 
 
 def train_and_predict_parallel(
-        data_packages: List[Tuple]
+        data_packages: List[Tuple], cores
     ) -> List[NDArray[np.float64]]:
     """Train and predict in parallel.
 
@@ -300,7 +300,7 @@ def train_and_predict_parallel(
         A list of predictions.
     """
 
-    with mp.Pool() as pool:
+    with mp.Pool(cores) as pool:
         predictions = pool.map(train_and_predict, data_packages)
 
     return predictions
@@ -447,7 +447,7 @@ def main():
     start_time = time.perf_counter()
 
     # Train the networks and get predictions
-    predictions = train_and_predict_parallel(data_packages)
+    predictions = train_and_predict_parallel(data_packages, args.cores)
 
     print(
         f"Networks finished training and sending their test data predictions in "
