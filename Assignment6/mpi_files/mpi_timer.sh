@@ -22,8 +22,8 @@ for ranks in {1..15}; do
         echo "$ranks,NULL" >> ./output/mpi_timings.csv
         continue
     fi
-    run_start_time=$(date +"%d-%m-%y %T")
-    echo "Started running with $ranks ranks at $run_start_time"
+    
+    echo "Started running with $ranks ranks at $(date +"%d-%m-%y %T")"
     # Run the Python script with mpiexec, using -np to specify the number of ranks
     start_time=$(date +%s.%N)
     mpiexec -np $ranks python3 ./mpi_files/assignment6_mpi.py -n 15 -s 15000 -b 12000 -e 30

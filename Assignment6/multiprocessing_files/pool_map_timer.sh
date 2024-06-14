@@ -19,8 +19,7 @@ echo "Cores,Time" > ./output/pool_timings.csv
 
 # Loop through the number of cores from 1 to 15
 for cores in {1..15}; do
-    run_start_time=$(date +"%d-%m-%y %T")
-    echo "Started running with $cores ranks at $run_start_time"
+    echo "Started running with $cores cores at $(date +"%d-%m-%y %T")"
     # Run the Python script with the specified number of cores and time the execution
     start_time=$(date +%s.%N)
     python3 ./multiprocessing_files/assignment6.py -n 15 -c $cores -s 15000 -b 12000 -e 30
