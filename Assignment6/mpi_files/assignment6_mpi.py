@@ -130,17 +130,6 @@ def init_args() -> argparse.Namespace:
         help="Number of epochs to train each network for. Default is 30."
     )
 
-    parser.add_argument(
-        "--seed",
-        dest="seed",
-        type=int,
-        default=None,
-        required=False,
-        help=
-            "Seed for the random number generator used for extracting MNIST data.\
-            Default is None"
-    )
-
     return parser.parse_args()
 
 
