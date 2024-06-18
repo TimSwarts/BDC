@@ -95,19 +95,24 @@ def phred_sum_parser(
         amount_of_lines += 1
         if len(line) > max_line_length:
             max_line_length = len(line)
+
     # Create an array to store all the PHRED scores
-    all_phred_scores = np.zeros((amount_of_lines, max_line_length))
+    all_phred_scores = np.full(
+        (amount_of_lines, max_line_length),
+        np.nan,
+        dtype=np.float64
+    )
 
     # Loop over the quality lines
     for i, line in enumerate(parsing_iterator):
         for j, char in enumerate(line):
             all_phred_scores[i, j] = char
 
-    all_phred_scores[np.nonzero(all_phred_scores)] -= 33
+    all_phred_scores[~np.isnan(all_phred_scores)] -= 33
 
-    # Calculate sum of all columns and amount of non-zero entries
-    chunk_phred_sum = np.sum(all_phred_scores, axis=0)
-    chunk_phred_count = np.count_nonzero(all_phred_scores, axis=0)
+    # Calculate sum of all columns and amount of entries per column
+    chunk_phred_sum = np.nansum(all_phred_scores, axis=0)
+    chunk_phred_count = np.count_nonzero(~np.isnan(all_phred_scores), axis=0)
 
     # Return the file path, sum and count
     return filepath, chunk_phred_sum, chunk_phred_count
@@ -131,6 +136,8 @@ def quality_line_generator(
         while fastq_file.tell() < stop:
             # readline
             line = fastq_file.readline()
+            if not line:
+                break  # break if EOF
             # check if identifier line
             if line.startswith(b"@"):
                 # if so, read until quality line and yield
@@ -186,10 +193,13 @@ def multi_processing(
         post_processing(results, file_paths, output_file_path)
 
 
-def post_processing(results: List[Tuple], file_paths: List[Path], output_file_path: Path = None) -> None:
+def post_processing(
+        results: List[Tuple], file_paths: List[Path], output_file_path: Path = None
+    ) -> None:
     """
     This function post processes the results of the multi-processing.
-    :param results: A list of tuples containing file path, sum of phred scores and count of scores.
+    :param results: A list of tuples containing file path, sum of phred scores
+                    and count of scores.
     :param file_paths: Paths of the FastQ files.
     :param output_file_path: Path of the output file.
     """

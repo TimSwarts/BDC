@@ -274,15 +274,15 @@ def get_R2_between_size_and_interpro_ids(df):
     This function contains the PySpark pipeline to fetch the R2 between the size
     of a protein and the number of InterPro annotations it has.
     :param df: Spark dataframe
-    :return: R2 between the size of a protein and the number of InterPro annotations it has and
-             the explanation of the pipeline as a string
+    :return: R2 between the size of a protein and the number of InterPro annotations it
+             has and the explanation of the pipeline as a string
     """
 
     # Get data frame in correct state
     grouped_df = (
         df.filter(df._c11.isNotNull() & (df._c11 != "-"))
-        .groupby("_c11").agg(avg("_c2").alias("avg_size"),
-                             count("_c11").alias("ïnterpro_count"))
+        .groupby("_c11")
+        .agg(avg("_c2").alias("avg_size"), count("_c11").alias("ïnterpro_count"))
     )
 
     # Get explanation of the pipeline as a string
