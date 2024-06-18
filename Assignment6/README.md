@@ -66,6 +66,8 @@ Assignment6/
 │   ├── slurm_script.sh              # SLURM script for running MPI version
 │   ├── mpi_timer.sh                 # Timing script for MPI version
 │   └── assignment6_mpi.py           # Main script for MPI version
+├── output/
+│   └── timings_plot.png             # Plot of processing time per cores
 ├── reference_material/
 │   ├── original_model_comparison.py # Script comparing original models
 │   └── Eindopdracht_v2223.1.ipynb   # Jupyter notebook for the final Advanced Datamining assignment
