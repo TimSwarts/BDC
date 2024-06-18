@@ -126,3 +126,11 @@ sbatch ./mpi_files/mpi_timer.sh
 ```
 This will run python script with 15 networks and 15000 instances repeatedly with an increasing amount of cores (1 to 15). The standard output will be redirected to `./output/slurm_logs/mpi_timer_%j.out` and the standar error to `./output/slurm_logs/mpi_timer_%j.out`. Where `%j` will be replaced with the job ID.
 The resulting csv file will be located at: `./output/mpi_timings.csv`.
+
+## Comparing Efficiency of Methods
+Using [`plot_times.py`](plot_times.py), the two output csv files were plotted, showing the
+processing time as a function of the number of resources. This resulted in the following figure:
+
+![](./output/timings_plot.png)
+
+There appears to be no significant difference in average processing time. It is important to note however that, since the OpenMPI version requires a master process, it only starts getting faster than serial computation with 3 ranks (1 master, 2 workers), whereas the multiprocessing version already runs calculations in parallel with just 2 cores. This is shown in the figure by the delayed drop of the OpenMPI line.
